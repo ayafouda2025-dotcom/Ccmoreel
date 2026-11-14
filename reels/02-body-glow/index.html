@@ -402,19 +402,23 @@ function sOpen(t) {
 
 // -------- S4 four shades collected 8.2–12.6 --------
 const SHADES = [
-  ['LUNAR GLOW', 'فضي', '#D9DCE6', '#FFFFFF', 9.45],
-  ['GALAXY KISS', 'برونزي', '#B0703F', '#E0A877', 9.95],
-  ['COSMIC SHINE', 'ذهبي', '#D9A93A', '#F7DC8A', 10.55],
-  ['MOON BEAM', 'وردي', '#E98ABC', '#F8C6E0', 11.32],
+  ['LUNAR GLOW', 'فضي', '#D9DCE6', '#FFFFFF', 9.45, 'tube_silver'],
+  ['GALAXY KISS', 'برونزي', '#B0703F', '#E0A877', 9.95, 'tube_bronze'],
+  ['COSMIC SHINE', 'ذهبي', '#D9A93A', '#F7DC8A', 10.55, 'tube_gold'],
+  ['MOON BEAM', 'وردي', '#E98ABC', '#F8C6E0', 11.32, 'tube_pink'],
 ];
 function shadeCard(i, cx, cy, sc, t) {
-  const [en, ar, col, hi] = SHADES[i];
+  const [en, ar, col, , , img] = SHADES[i];
   g.save(); g.translate(cx, cy); g.scale(sc, sc);
-  panel(-200, -125, 400, 250, C.ivory, { so: 10 });
-  g.fillStyle = col; g.fillRect(-194, -119, 388, 14);
-  bottle(-120, 8, 14, col, hi);
-  drawT(ptext(ar, { size: 22, color: C.mauve }), 70, -32, 4);
-  drawT(ptext(en, { size: 7, weight: 400, family: 'Press Start 2P', color: C.pinkD }), 70, 50, 3);
+  panel(-210, -135, 420, 270, C.ivory, { so: 10 });
+  g.fillStyle = col; g.fillRect(-204, -129, 408, 14);
+  // the real tube, cropped from the store photo
+  const im = IMG[img], ih = 232, iw = ih * im.width / im.height;
+  g.save(); g.beginPath(); g.rect(-196, -112, iw, ih); g.clip(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(im, -196, -112, iw, ih); g.restore();
+  g.strokeStyle = C.ink; g.lineWidth = 4; g.strokeRect(-196, -112, iw, ih);
+  drawT(ptext(ar, { size: 22, color: C.mauve }), 52, -30, 3.3);
+  drawT(ptext(en, { size: 7, weight: 400, family: 'Press Start 2P', color: C.pinkD }), 52, 52, 2.4);
   g.restore();
 }
 function sItems(t) {
@@ -583,7 +587,7 @@ function draw(t) {
 window.__ready = false;
 window.seek = (t) => { draw(t); return true; };
 (async () => {
-  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('box', 'assets/box.png'), loadImg('brush', 'assets/brush.png'), loadImg('swatch', 'assets/swatch.png'),
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('box', 'assets/box.png'), loadImg('brush', 'assets/brush.png'), loadImg('swatch', 'assets/swatch.png'), ...['silver', 'bronze', 'gold', 'pink'].map((n) => loadImg('tube_' + n, `assets/tube_${n}.png`)),
     loadImg('p_home', 'assets/01_home.png'), loadImg('p_product', 'assets/03_product.png'), loadImg('p_add', 'assets/04_addtocart.png'),
     loadImg('av_bust', 'assets/avatar/bust.png'), loadImg('av_front', 'assets/avatar/front.png'), ...FACES.map((f) => loadImg('av_face_' + f, `assets/avatar/face_${f}.png`))]);
   IMG.logoW = tint(IMG.logo, C.ivory);
