@@ -344,17 +344,14 @@ function rays(cx, cy, r, t, alpha) {
 }
 
 // ---------- host ----------
-function hostFace(t) {
-  let f = 'neutral';
-  if (t < 5.5) f = 'oh'; else if (t < 8.2) f = 'laugh'; else if (t < 12.6) f = t > 9.4 ? 'love' : 'oh';
-  else if (t < 15.2) f = 'neutral'; else if (t < 19.6) f = 'think'; else if (t < 23) f = 'love'; else f = 'selfie';
-  if ((f === 'neutral' || f === 'think') && vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0) f = 'oh';
-  return f;
-}
+// one fixed expression per scene; it only changes on a scene cut, with a small pop
+const HOST = [[2.8, 'oh'], [5.5, 'laugh'], [8.2, 'love'], [12.6, 'neutral'], [15.2, 'think'], [19.6, 'wink'], [23.0, 'selfie']];
 function drawHost(t) {
   if (t < 2.8 || t >= 29.6) return;
-  const k = sp(t - 2.8, PLAYFUL), bob = Math.sin(t * 4.2) * 4;
-  drawAv('face_' + hostFace(t), 170, 1935 + (1 - k) * 320 + bob, 1.55);
+  let face = HOST[0][1], t0 = HOST[0][0]; for (const [a, f] of HOST) if (t >= a) { face = f; t0 = a; }
+  const k = sp(t - 2.8, PLAYFUL), pop = t0 > 2.8 ? 1 + 0.08 * Math.exp(-(t - t0) * 9) * Math.sin(Math.min(Math.PI, (t - t0) * 14)) : 1;
+  const bob = Math.sin(t * 4.2) * 4;
+  drawAv('face_' + face, 170, 1935 + (1 - k) * 320 + bob, 1.55 * pop);
 }
 
 // -------- S1 hook 0–2.8 --------
@@ -365,7 +362,7 @@ function sHook(t) {
   wordLine(t, [['عندي', 0.35], ['زواج…', 0.75]], W / 2, 560, 5, { size: 24, color: C.ivory, shadow: C.pink, shadowOff: 2 });
   wordLine(t, [['وأبي', 1.55], ['ألمع!', 1.9]], W / 2, 720, 6, { size: 24, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
   const bk = sp(t, [180, 20]), out = easeIn((t - 2.55) / 0.3);
-  const face = vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0 ? 'face_laugh' : 'face_selfie';
+  const face = 'face_selfie';
   drawAv(face, 540, 1960 + (1 - bk) * 160 + out * 1100 + Math.sin(t * 3) * 6, 4.6);
   const r = rng(8);
   for (let i = 0; i < 6; i++) { const ti = 1.9 + i * 0.08, k = sp(t - ti, PLAYFUL); if (k > 0) drawSpr(sparkle(i % 2 ? C.pink : C.ivory, i % 2 ? C.ivory : C.pink), 160 + r() * 760, 860 + r() * 260, 7 * k * (0.8 + 0.4 * Math.sin(t * 8 + i))); }

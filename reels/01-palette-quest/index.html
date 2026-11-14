@@ -298,20 +298,14 @@ function girlFace(t, eyesDefault, mouthDefault) {
 
 // ================= SCENES =================
 // host girl position: big in the hook, then bottom-left host for the rest
-function hostFace(t) {
-  let f = 'neutral';
-  if (t < 4.5) f = 'neutral'; else if (t < 7.1) f = 'oh'; else if (t < 7.5) f = 'think';
-  else if (t < 9.2) f = 'laugh'; else if (t < 12) f = 'selfie'; else if (t < 14.5) f = t > 13.7 ? 'laugh' : 'think';
-  else if (t < 18.0) f = t > 15.9 ? 'oh' : 'neutral'; else if (t < 19.5) f = 'love';
-  else if (t < 22.45) f = 'coffee'; else f = 'wink';
-  // lip flap: swap to the open-mouth face on voiced frames (only for the plain faces)
-  if ((f === 'neutral' || f === 'think') && vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0) f = 'oh';
-  return f;
-}
+// one fixed expression per scene; it only changes on a scene cut, with a small pop
+const HOST = [[1.85, 'oh'], [9.2, 'selfie'], [12.0, 'think'], [14.5, 'love'], [19.5, 'wink']];
+function hostFace(t) { let f = HOST[0][1]; for (const [a, x] of HOST) if (t >= a) f = x; return f; }
+function hostPop(t) { let t0 = 0; for (const [a] of HOST) if (t >= a) t0 = a; return t0 > 1.85 ? 1 + 0.08 * Math.exp(-(t - t0) * 9) * Math.sin(Math.min(Math.PI, (t - t0) * 14)) : 1; }
 function drawHost(t) {
   if (t < 1.85 || t >= 25.2 || (t >= 7.2 && t < 9.2)) return;
   const k = sp(t - 1.85, PLAYFUL), bob = Math.sin(t * 4.2) * 4;
-  drawAv('face_' + hostFace(t), 170, 1935 + (1 - k) * 320 + bob, 1.55);
+  drawAv('face_' + hostFace(t), 170, 1935 + (1 - k) * 320 + bob, 1.55 * hostPop(t));
 }
 
 // -------- S1 hook 0–1.8 --------
@@ -551,7 +545,7 @@ function sLock(t) {
   g.restore();
   // the creator rises from behind the seal and winks
   const ak = sp(t - 25.85, PLAYFUL);
-  if (ak > 0) { const face = t > 28.9 ? 'wink' : (vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0 ? 'oh' : 'neutral');
+  if (ak > 0) { const face = 'wink';
     drawAv('face_' + face, 540, 590 + (1 - ak) * 300 + Math.sin(t * 3) * 4, 1.9);
     if (t > 28.9) drawSpr(sparkle(), 735, 380, 7 * sp(t - 28.95, PLAYFUL)); }
   // circle seal
