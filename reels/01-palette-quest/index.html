@@ -336,8 +336,9 @@ function sHook(t) {
 const RAIN = (() => { const r = rng(42); return PALETTES.slice(0, 16).map((id, i) => ({
   id, t0: 4.62 + i * 0.11, x: 230 + r() * 620, y: 1500 - i * 18 - r() * 50, w: 330 + r() * 90, r0: (r() - 0.5) * 1.6, r1: (r() - 0.5) * 0.7, xs: (r() - 0.5) * 300 })); })();
 function drawPalette(id, x, y, w, rot, alpha = 1) {
-  const im = IMG['px_' + id]; if (!im) return; const h = w * im.height / im.width;
-  g.save(); g.globalAlpha *= alpha; g.imageSmoothingEnabled = false; g.translate(x, y); g.rotate(rot);
+  const im = IMG[id]; if (!im) return; const h = w * im.height / im.width;
+  g.save(); g.globalAlpha *= alpha; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.translate(x, y); g.rotate(rot);
+  g.shadowColor = 'rgba(30,18,38,.45)'; g.shadowBlur = 28; g.shadowOffsetY = 16;
   g.drawImage(im, -w / 2, -h / 2, w, h); g.restore();
 }
 function sInvite(t) {
@@ -418,8 +419,8 @@ function sSearch(t) {
     const col = 2 - (i % 3), row = Math.floor(i / 3), cx = 230 + col * 310, cy = 920 + row * 230;
     g.save(); g.translate(cx + (i % 2 ? jit : -jit), cy); g.scale(k, k);
     panel(-140, -100, 280, 200, '#FFFFFF', { border: C.lav, bw: 5, so: 6, shadow: 'rgba(101,74,112,.25)' });
-    const im = IMG['px_' + id], ih = Math.min(160, 230 * im.height / im.width), iw2 = ih * im.width / im.height;
-    g.imageSmoothingEnabled = false; g.drawImage(im, -iw2 / 2, -ih / 2, iw2, ih); g.restore();
+    const im = IMG[id], ih = Math.min(165, 240 * im.height / im.width), iw2 = ih * im.width / im.height;
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, -iw2 / 2, -ih / 2, iw2, ih); g.restore();
   });
   g.restore();
   // counter chip
@@ -516,7 +517,7 @@ function sTurn(t) {
   const pk = sp(t - 19.55, DEFAULT), w = 610 * pk;
   g.save(); g.translate(540, 960 + Math.sin(t * 2.2) * 10); g.scale(Math.max(0.06, Math.abs(Math.cos(ph))), 1);
   if (Math.cos(ph) >= 0) drawPalette(HERO, 0, 0, w * 0.92, 0);
-  else { const im = IMG['px_' + HERO], bw = w * 0.92, bh = bw * im.height / im.width; panel(-bw / 2, -bh / 2, bw, bh, '#1E1622', { border: C.ink, so: 14 }); }
+  else { const im = IMG[HERO], bw = w * 0.92, bh = bw * im.height / im.width; panel(-bw / 2, -bh / 2, bw, bh, '#1E1622', { border: C.ink, so: 14 }); }
   g.restore();
   // call-outs
   const tags = [
@@ -598,7 +599,7 @@ function draw(t) {
 window.__ready = false;
 window.seek = (t) => { draw(t); return true; };
 (async () => {
-  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('px_' + HERO, `assets/px/${HERO}.png`), ...PALETTES.map((id) => loadImg('px_' + id, `assets/px/${id}.png`)),
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg(HERO, `assets/${HERO}.png`), ...PALETTES.map((id) => loadImg(id, `assets/${id}.png`)),
     loadImg('av_bust', 'assets/avatar/bust.png'), loadImg('av_front', 'assets/avatar/front.png'), ...FACES.map((f) => loadImg('av_face_' + f, `assets/avatar/face_${f}.png`))]);
   IMG.logoW = tint(IMG.logo, C.ivory);
   await Promise.all(['900 20px Cairo', '800 20px Cairo', '700 20px Cairo', '20px "Press Start 2P"', '500 20px Montserrat', '600 20px Montserrat'].map((f) => document.fonts.load(f, 'abcأب٠')));
