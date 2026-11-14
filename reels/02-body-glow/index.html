@@ -547,10 +547,6 @@ function sLock(t) {
     const xx = x + (row % 2) * 85 + off + (dr % 170), yy = y + (dr * 0.5 % 170);
     g.globalAlpha = 0.7; drawSpr(fl, xx, yy, 6); g.globalAlpha = 1; g.fillStyle = C.pinkD; g.fillRect(xx + 80, yy + 80, 10, 10); }
   g.restore();
-  const ak = sp(t - 30.2, PLAYFUL);
-  if (ak > 0) { const face = t > 33.2 ? 'wink' : (vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0 ? 'oh' : 'neutral');
-    drawAv('face_' + face, 540, 590 + (1 - ak) * 300 + Math.sin(t * 3) * 4, 1.9);
-    if (t > 33.2) drawSpr(sparkle(), 735, 380, 7 * sp(t - 33.25, PLAYFUL)); }
   const ck = sp(t - 29.78, HEAVY);
   if (ck > 0) { g.save(); g.translate(540, 950); g.scale(ck, ck);
     g.fillStyle = C.mauve; g.beginPath(); g.arc(0, 0, 420, 0, Math.PI * 2); g.fill();
