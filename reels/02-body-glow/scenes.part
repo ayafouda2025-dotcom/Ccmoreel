@@ -57,18 +57,32 @@ function drawHost(t) {
   drawAv('face_' + face, 170, 1935 + (1 - k) * 320 + bob, 1.55 * pop);
 }
 
-// -------- S1 hook 0–2.8 --------
+// -------- S1 opening 0–2.8: a wedding invitation lands on her lock screen --------
 function sHook(t) {
-  bg(C.mauve, C.mauveD, t * 20);
-  const lk = sp(t - 0.08, SNAPPY);
-  if (lk > 0) { const L = IMG.logoW, w = 520 * (0.7 + 0.3 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 2); g.drawImage(L, W / 2 - w / 2, 330 - h / 2, w, h); g.restore(); }
-  wordLine(t, [['عندي', 0.35], ['زواج…', 0.75]], W / 2, 560, 5, { size: 24, color: C.ivory, shadow: C.pink, shadowOff: 2 });
-  wordLine(t, [['وأبي', 1.55], ['ألمع!', 1.9]], W / 2, 720, 6, { size: 24, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
-  const bk = sp(t, [180, 20]), out = easeIn((t - 2.55) / 0.3);
-  const face = 'face_selfie';
-  drawAv(face, 540, 1960 + (1 - bk) * 160 + out * 1100 + Math.sin(t * 3) * 6, 4.6);
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2B1C33'); gr.addColorStop(0.55, '#654A70'); gr.addColorStop(1, '#D0B9D9');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.save(); g.filter = 'blur(70px)';
+  [[260, 520, 260, C.pink], [820, 900, 300, C.lav], [400, 1500, 340, C.pinkL]].forEach(([x, y, r, c], i) => { g.fillStyle = c; g.globalAlpha = 0.55; g.beginPath(); g.arc(x + Math.sin(t * 0.8 + i) * 60, y + Math.cos(t * 0.6 + i) * 50, r, 0, Math.PI * 2); g.fill(); });
+  g.restore();
+  const L = IMG.logoW, lw = 300, lh = lw * L.height / L.width; g.save(); g.globalAlpha = clamp(t * 4); g.drawImage(L, W / 2 - lw / 2, 210 - lh / 2, lw, lh); g.restore();
+  text('8:00', 540, 470, { size: 230, weight: 600, family: 'Montserrat', color: C.ivory, alpha: clamp(t * 4) });
+  text('الخميس', 540, 640, { size: 54, weight: 700, color: C.lavL, alpha: clamp(t * 4) });
+  // the invitation notification drops in
+  const nk = sp(t - 0.3, [220, 18]), ny = lerp(-260, 860, nk);
+  g.save(); g.translate(540, ny);
+  g.fillStyle = 'rgba(250,247,248,.93)'; g.beginPath(); g.roundRect(-470, -125, 940, 250, 46); g.fill();
+  g.fillStyle = C.pink; g.beginPath(); g.roundRect(330, -70, 110, 110, 28); g.fill();
+  g.fillStyle = C.ivory; g.fillRect(350, -40, 70, 50); g.fillStyle = C.pinkD; g.beginPath(); g.moveTo(350, -40); g.lineTo(385, -8); g.lineTo(420, -40); g.closePath(); g.fill();
+  text('دعوة زواج', 270, -45, { size: 52, weight: 800, color: C.mauve, align: 'right' });
+  text('الخميس ٨ مساءً · لا تتأخرين', 270, 35, { size: 40, weight: 600, family: 'Tajawal', color: C.mauveD, align: 'right' });
+  text('الآن', -420, -60, { size: 32, weight: 500, family: 'Tajawal', color: C.lavD, align: 'left' });
+  g.restore();
+  // her reaction rises from the bottom
+  const bk = sp(t - 0.85, [180, 18]), out = easeIn((t - 2.55) / 0.3);
+  drawAv('face_selfie', 540, 1960 + (1 - bk) * 900 + out * 1100 + Math.sin(t * 3) * 6, 4.2);
+  wordLine(t, [['وأبي', 1.55], ['ألمع!', 1.9]], W / 2, 1110, 6, { size: 24, color: C.ivory, shadow: C.pink, shadowOff: 2 });
   const r = rng(8);
-  for (let i = 0; i < 6; i++) { const ti = 1.9 + i * 0.08, k = sp(t - ti, PLAYFUL); if (k > 0) drawSpr(sparkle(i % 2 ? C.pink : C.ivory, i % 2 ? C.ivory : C.pink), 160 + r() * 760, 860 + r() * 260, 7 * k * (0.8 + 0.4 * Math.sin(t * 8 + i))); }
+  for (let i = 0; i < 6; i++) { const ti = 1.9 + i * 0.08, k = sp(t - ti, PLAYFUL); if (k > 0) drawSpr(sparkle(i % 2 ? C.pink : C.ivory, i % 2 ? C.ivory : C.pink), 160 + r() * 760, 1050 + r() * 260, 7 * k * (0.8 + 0.4 * Math.sin(t * 8 + i))); }
 }
 
 // -------- S2 LEVEL 2 + chest drops 2.8–5.5 --------
@@ -239,18 +253,12 @@ function sOrder(t) {
 
 // -------- S9 lockup 29.6–34.4 --------
 function sLock(t) {
-  const T0 = 29.6, wk = easeOut((t - T0) / 0.45), off = (1 - wk) * W;
-  g.fillStyle = C.mauve; g.fillRect(off, 0, W, H);
-  const fl = flowerTile(), dr = (t - T0) * 18;
-  g.save(); g.beginPath(); g.rect(off, 0, W, H); g.clip();
-  for (let y = -200, row = 0; y < H + 200; y += 170, row++) for (let x = -200; x < W + 200; x += 170) {
-    const xx = x + (row % 2) * 85 + off + (dr % 170), yy = y + (dr * 0.5 % 170);
-    g.globalAlpha = 0.7; drawSpr(fl, xx, yy, 6); g.globalAlpha = 1; g.fillStyle = C.pinkD; g.fillRect(xx + 80, yy + 80, 10, 10); }
-  g.restore();
+  // starry ending (different from the other reels): glowing ring + the real box
+  const T0 = 29.6; space(t, C.mauveDD); rays(540, 950, 1300, t, 0.3 * clamp((t - T0) * 3));
   const ck = sp(t - 29.78, HEAVY);
-  if (ck > 0) { g.save(); g.translate(540, 950); g.scale(ck, ck);
-    g.fillStyle = C.mauve; g.beginPath(); g.arc(0, 0, 420, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = C.lavD; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 440, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(0, 0, 404, 0, Math.PI * 2); g.stroke(); g.restore(); }
+  if (ck > 0) { g.save(); g.translate(540, 950); g.scale(ck, ck); g.shadowColor = C.pink; g.shadowBlur = 50;
+    g.strokeStyle = C.pinkL; g.lineWidth = 12; g.beginPath(); g.arc(0, 0, 430, 0, Math.PI * 2); g.stroke(); g.restore(); }
+  const bx = sp(t - 29.95, PLAYFUL); if (bx > 0) photo('box', 540, 400, 360 * bx);
   const nk = sp(t - 30.05, SNAPPY);
   if (nk > 0) text('Body Glow', 540, 765, { size: 104, weight: 400, family: 'Allura', color: C.pinkLL, alpha: clamp(nk * 3) });
   const lk = sp(t - 30.6, HEAVY);

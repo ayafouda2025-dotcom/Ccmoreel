@@ -7,7 +7,7 @@
 <script src="env.js"></script>
 <script>
 // Kara Duo · Reel 03 "مهمة الميكب آرتست" (makeup trolley bag) — every frame is a pure function of t (window.seek)
-const W = 1080, H = 1920, DUR = 31.6;
+const W = 1080, H = 1920, DUR = 37.0;
 const cv = document.getElementById('c'), g = cv.getContext('2d');
 
 // ---------------- brand palette ----------------

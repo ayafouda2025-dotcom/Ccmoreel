@@ -28,7 +28,7 @@ if (arg('stills')) {
     'out/contact.png']);
   console.log('contact -> out/contact.png');
 } else {
-  const FPS = Number(arg('fps', 30)), from = Number(arg('from', 0)), to = Number(arg('to', 31.6));
+  const FPS = Number(arg('fps', 30)), from = Number(arg('from', 0)), to = Number(arg('to', 37.0));
   const out = arg('out', 'out/silent.mp4');
   const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '16', '-pix_fmt', 'yuv420p', '-r', String(FPS), out], { stdio: ['pipe', 'inherit', 'inherit'] });

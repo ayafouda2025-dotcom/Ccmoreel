@@ -308,22 +308,29 @@ function drawHost(t) {
   drawAv('face_' + hostFace(t), 170, 1935 + (1 - k) * 320 + bob, 1.55 * hostPop(t));
 }
 
-// -------- S1 hook 0–1.8 --------
+// -------- S1 opening 0–1.8: CRT switches on to a game title screen; her question is the game's title --------
 function sHook(t) {
+  g.fillStyle = '#1E1424'; g.fillRect(0, 0, W, H);
+  const on = easeOut(t / 0.28), hh = Math.max(8, H * on);
+  g.save(); g.beginPath(); g.rect(0, H / 2 - hh / 2, W, hh); g.clip();
   bg(C.mauve, C.mauveD, t * 20);
-  // logo in the first 2 seconds
-  const lk = sp(t - 0.08, SNAPPY);
-  if (lk > 0) { const L = IMG.logoW, w = 520 * (0.7 + 0.3 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 2); g.drawImage(L, W / 2 - w / 2, 330 - h / 2, w, h); g.restore(); }
-  const bk = sp(t, [180, 20]), out = easeIn((t - 1.65) / 0.3);
-  drawAv('bust', 560, 1960 + (1 - bk) * 120 + out * 900 + Math.sin(t * 3) * 6, 2.05);
-  wordLine(t, [['وش', 0.35], ['أحط', 0.55], ['الليلة؟', 0.85]], W / 2, 640, 4.4, { size: 26, color: C.ivory, shadow: C.pink, shadowOff: 2 });
-  // question bubbles pop around her head
-  [[0.45, 170, 1010, -0.12], [0.8, 930, 960, 0.1], [1.15, 960, 1240, 0.16]].forEach(([tq, x, y, r], i) => {
-    const k = sp(t - tq, PLAYFUL); if (k <= 0) return;
-    g.save(); g.translate(x, y + Math.sin(t * 5 + i) * 8); g.rotate(r); g.scale(k, k);
-    panel(-70, -70, 140, 140, i === 1 ? C.pinkL : C.lav, { so: 8 }); drawT(ptext('؟', { size: 26, color: C.ivory, shadow: C.ink }), 0, -4, 4);
-    g.restore();
-  });
+  const lk = sp(t - 0.2, SNAPPY);
+  if (lk > 0) { const L = IMG.logoW, w = 460 * (0.7 + 0.3 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 2); g.drawImage(L, W / 2 - w / 2, 300 - h / 2, w, h); g.restore(); }
+  // title plate
+  const tk = sp(t - 0.25, PLAYFUL);
+  g.save(); g.translate(540, 560); g.scale(tk, tk); panel(-420, -120, 840, 240, C.ivory, { so: 14 }); g.restore();
+  if (tk > 0.5) wordLine(t, [['وش', 0.35], ['أحط', 0.55], ['الليلة؟', 0.85]], W / 2, 555, 3.3, { size: 26, color: C.mauve, shadow: C.pinkLL, shadowOff: 2 });
+  // player portrait in a pixel frame
+  const fk = sp(t - 0.35, [200, 18]);
+  g.save(); g.translate(540, 1210); g.scale(fk, fk); panel(-300, -390, 600, 780, C.lav, { so: 14 });
+  g.fillStyle = C.lavL; for (let y = -370; y < 380; y += 40) g.fillRect(-280, y, 560, 18);
+  g.beginPath(); g.rect(-288, -378, 576, 756); g.clip(); drawAv('bust', 20, 400, 1.3); g.restore();
+  drawT(ptext('PLAYER 1', { size: 9, weight: 400, family: 'Press Start 2P', color: C.ivory, shadow: C.ink }), 540, 1650, 4, { sc: fk });
+  if (Math.floor(t * 4) % 2 === 0 && t < 1.5) drawT(ptext('PRESS START', { size: 12, weight: 400, family: 'Press Start 2P', color: '#F7C948', outline: C.ink }), 540, 1760, 4.4);
+  if (t > 1.1) { const mk = easeOut((t - 1.1) / 0.35); drawSpr(hand(), lerp(1000, 640, mk), lerp(1920, 1770, mk), 7, 0.2, 0.05); }
+  g.fillStyle = 'rgba(20,10,28,.16)'; for (let y = 0; y < H; y += 8) g.fillRect(0, y, W, 3);       // CRT scanlines
+  g.restore();
+  if (t > 1.5) { g.fillStyle = `rgba(255,255,255,${clamp(1 - Math.abs(t - 1.65) / 0.15)})`; g.fillRect(0, 0, W, H); }
 }
 
 // -------- S2 invite + palette rain 1.8–7.5 --------
