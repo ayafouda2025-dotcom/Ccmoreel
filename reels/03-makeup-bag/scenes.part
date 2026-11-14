@@ -1,0 +1,238 @@
+// ---------- reel-03 drawing helpers ----------
+const FACES3 = ['neutral', 'content', 'laugh', 'wink', 'think', 'love', 'drink', 'cool'];
+function pouch(cx, cy, s, items, t) {                          // clear zip pouch (pixel, illustrative)
+  g.save(); g.translate(cx, cy); g.scale(s, s);
+  panel(-120, -80, 240, 160, 'rgba(243,236,246,.55)', { border: C.ink, bw: 6, step: 18, so: 8 });
+  g.fillStyle = C.mauveDD; g.fillRect(-114, -74, 228, 18);
+  g.fillStyle = C.lavD; for (let x = -108; x < 108; x += 12) g.fillRect(x, -68, 6, 6);
+  g.fillStyle = '#F7C948'; g.fillRect(78, -78, 18, 30); g.fillStyle = C.ink; g.fillRect(84, -54, 6, 8);
+  items.forEach(([x, y, w, h, c]) => { g.fillStyle = c; g.fillRect(x, y, w, h); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x, y, w, 6); });
+  g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(-100, -40, 30, 100);
+  g.restore();
+}
+function brushIcon(cx, cy, s, rot, col) {
+  g.save(); g.translate(cx, cy); g.rotate(rot);
+  g.fillStyle = C.ink; g.fillRect(-4 * s, -14 * s, 8 * s, 28 * s);
+  g.fillStyle = C.mauveDD; g.fillRect(-3 * s, 2 * s, 6 * s, 12 * s);
+  g.fillStyle = '#C9C9D3'; g.fillRect(-3 * s, -4 * s, 6 * s, 6 * s);
+  g.fillStyle = col; g.fillRect(-3 * s, -13 * s, 6 * s, 9 * s); g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(-3 * s, -13 * s, 2 * s, 9 * s);
+  g.restore();
+}
+function clockPill(cx, cy, time, k, word = null) {             // time in LTR pixel digits, optional Arabic word on the right
+  const wc = word ? ptext(word, { size: 18, color: C.ivory }) : null, ww = wc ? wc.width * 3.6 + 30 : 0, w = 360 + ww;
+  g.save(); g.translate(cx, cy); g.scale(k, k); pill(0, 0, w, 104, C.ink, C.ink);
+  g.fillStyle = '#F7C948'; g.beginPath(); g.arc(-w / 2 + 52, 0, 30, 0, Math.PI * 2); g.fill(); g.fillStyle = C.ink; g.fillRect(-w / 2 + 50, -20, 5, 22); g.fillRect(-w / 2 + 50, -2, 18, 5);
+  const tc = ptext(time, { size: 12, weight: 400, family: 'Press Start 2P', color: '#F7C948' }); drawT(tc, -w / 2 + 98 + tc.width * 3.4 / 2, 0, 3.4);
+  if (wc) drawT(wc, w / 2 - ww / 2 - 10, -2, 3.6);
+  g.restore();
+}
+const CHAOS = ['85389240', 'ed15fa8d', 'a938f01b', '7096dce4', 'box', 'tube_gold', 'tube_pink', 'brush'];
+
+// ---------- host: one fixed expression per scene ----------
+const HOST = [[3.3, 'wink'], [6.4, 'think'], [11.2, 'love'], [15.0, 'content']];
+function drawHost(t) {
+  if (t < 3.3 || t >= 17.8) return;                             // she walks herself in the run scene; hidden after
+  let face = HOST[0][1], t0 = HOST[0][0]; for (const [a, f] of HOST) if (t >= a) { face = f; t0 = a; }
+  const k = sp(t - 3.3, PLAYFUL), pop = t0 > 3.3 ? 1 + 0.08 * Math.exp(-(t - t0) * 9) * Math.sin(Math.min(Math.PI, (t - t0) * 14)) : 1;
+  drawAv('face_' + face, 170, 1935 + (1 - k) * 320 + Math.sin(t * 4.2) * 4, 1.55 * pop);
+}
+
+// -------- S1 chaos 0–3.3 --------
+function sChaos(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  const r = rng(31);
+  CHAOS.forEach((id, i) => { const k = sp(t - 0.05 - i * 0.06, PLAYFUL), x = 120 + r() * 840, y = 820 + r() * 520, w = id.startsWith('tube') ? 120 : id === 'brush' ? 170 : 250 + r() * 60;
+    if (k > 0) photo(id, x + Math.sin(t * 2 + i) * 30, y + Math.cos(t * 1.7 + i * 2) * 26, w * k, { rot: Math.sin(t * 1.3 + i) * 0.5 }); });
+  const lk = sp(t - 0.08, SNAPPY);
+  if (lk > 0) { const L = IMG.logoW, w = 480 * (0.7 + 0.3 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 2); g.drawImage(L, W / 2 - w / 2, 300 - h / 2, w, h); g.restore(); }
+  const ring = t > 0.2 ? Math.sin(t * 50) * 0.06 * Math.max(0, Math.sin(t * 3)) : 0;
+  g.save(); g.translate(540, 470); g.rotate(ring); clockPill(0, 0, '6:00PM', sp(t - 0.2, PLAYFUL), 'عروس'); g.restore();
+  wordLine(t, [['وأغراضي', 1.85], ['في', 2.35], ['كل', 2.5], ['مكان!', 2.65]], W / 2, 640, 3.7, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  const bk = sp(t, [180, 20]), out = easeIn((t - 3.05) / 0.25);
+  drawAv('face_think', 540, 1960 + (1 - bk) * 160 + out * 1100 + Math.sin(t * 3) * 6, 3.9);
+}
+
+// -------- S2 mission + bag rolls in 3.3–6.4 --------
+function sMission(t) {
+  space(t);
+  const mk = sp(t - 3.35, SNAPPY);
+  if (mk > 0) { g.save(); g.translate(lerp(1300, 540, mk), 330); g.rotate(-0.03); pill(0, 0, 640, 130, C.pink);
+    drawT(ptext('MISSION 03', { size: 16, weight: 400, family: 'Press Start 2P', color: C.ivory, shadow: C.pinkD, shadowOff: 2 }), 0, 0, 4); g.restore(); }
+  wordLine(t, [['الميكب', 3.6], ['آرتست', 3.9]], W / 2, 490, 5, { size: 22, color: C.lavL, shadow: C.ink, shadowOff: 2 });
+  // bag rolls in and skids to a stop on "كارا دو"
+  const rk = sp(t - 4.1, [120, 15]), x = lerp(1500, 540, rk), tilt = (1 - rk) * -0.12 + (rk > 1 ? (rk - 1) * 0.6 : 0);
+  if (t > 4.1 && rk < 0.97) { g.fillStyle = 'rgba(243,236,246,.35)'; for (let i = 0; i < 6; i++) g.fillRect(x + 300 + i * 40, 900 + i * 70, 160, 10); }
+  g.fillStyle = 'rgba(20,10,28,.45)'; g.beginPath(); g.ellipse(x, 1365, 300, 34, 0, 0, Math.PI * 2); g.fill();
+  photo('bag', x, 1060, 640, { rot: tilt, shadow: false });
+  if (t > 4.9 && t < 5.7) { const d = (t - 4.9) / 0.8, r = rng(9); for (let i = 0; i < 10; i++) { const a = Math.PI + r() * Math.PI * 0.7 - 0.2, dd = easeOut(d) * (80 + r() * 160);
+    g.globalAlpha = 1 - d; g.fillStyle = i % 2 ? C.lavL : C.lavD; g.fillRect(x - 260 + Math.cos(a) * dd, 1350 + Math.sin(a) * dd * 0.5, 18, 18); } g.globalAlpha = 1; }
+  wordLine(t, [['شنطة', 4.4], ['كارا', 4.75], ['دو', 4.95]], W / 2, 640, 5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+}
+
+// -------- S3 dividers = tetris 6.4–11.2 --------
+const BOARD = [[0, 0, C.pink, 7.0], [1, 0, '#F7C948', 7.3], [2, 0, C.lav, 7.6], [3, 0, '#B0703F', 7.9], [4, 0, C.pinkL, 8.2],
+  [0, 1, '#D9DCE6', 8.35], [1, 1, C.pinkD, 8.5], [2, 1, '#D9A93A', 8.65], [3, 1, C.lavD, 8.8], [4, 1, '#E98ABC', 8.95]];
+function sTetris(t) {
+  space(t);
+  wordLine(t, [['فواصل', 6.75], ['ترتبينها', 7.2], ['على', 7.75], ['كيفك…', 7.95]], W / 2, 290, 3.5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  const ok = sp(t - 6.45, DEFAULT);
+  photo('open', 540, 720 + (1 - ok) * 400, 460, { frame: C.ivory, alpha: clamp(ok * 3) });
+  // the divider board
+  const bx = 190, by = 1040, cw = 140, ch = 150;
+  panel(bx - 20, by - 20, cw * 5 + 40, ch * 2 + 40, C.mauveDD, { so: 12 });
+  g.fillStyle = C.ink; for (let i = 1; i < 5; i++) g.fillRect(bx + i * cw - 4, by, 8, ch * 2); g.fillRect(bx, by + ch - 4, cw * 5, 8);
+  for (const [c, r, col, ti] of BOARD) {
+    const d = t - ti; if (d < -0.35) continue;
+    const fall = d < 0 ? easeIn((d + 0.35) / 0.35) : 1, x = bx + (4 - c) * cw + 14, y = lerp(-200, by + r * ch + 14, fall);
+    g.fillStyle = C.ink; g.fillRect(x - 4, y - 4, cw - 20, ch - 20);
+    g.fillStyle = col; g.fillRect(x, y, cw - 28, ch - 28); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x, y, cw - 28, 10);
+  }
+  if (t > 9.05) { const fl = Math.sin((t - 9.05) * 30) > 0 && t < 9.5; if (fl) { g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(bx, by, cw * 5, ch * 2); }
+    const pk = sp(t - 9.1, PLAYFUL); drawT(ptext('PERFECT!', { size: 14, weight: 400, family: 'Press Start 2P', color: '#F7C948', outline: C.ink }), 540, 1470, 5, { sc: pk, rot: -0.05 }); }
+  if (t > 8.95) wordLine(t, [['كل', 8.98], ['شي', 9.2], ['له', 9.4], ['مكانه', 9.55]], W / 2, 400, 3.6, { size: 20, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
+}
+
+// -------- S4 four clear pouches = inventory 11.2–15.0 --------
+const POUCH_ITEMS = [
+  [[-80, -30, 40, 70, C.pink], [-30, -10, 60, 40, '#F7C948'], [40, -36, 30, 80, C.lav]],
+  [[-90, -20, 80, 50, '#B0703F'], [0, -36, 36, 76, C.pinkL], [50, -10, 44, 44, '#D9DCE6']],
+  [[-80, -36, 30, 80, C.lavD], [-40, -20, 70, 56, C.pinkD], [44, -30, 40, 64, '#D9A93A']],
+  [[-90, -10, 50, 50, '#E98ABC'], [-30, -36, 34, 80, C.mauve], [20, -20, 70, 50, C.ivory]],
+];
+function sPouches(t) {
+  space(t);
+  photo('bag', 540, 600, 420, { shadow: false });
+  wordLine(t, [['وأربع', 11.4], ['شنط', 11.85], ['شفافة', 12.1]], W / 2, 300, 5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  [11.95, 12.55, 13.15, 13.75].forEach((ti, i) => {
+    const k = sp(t - ti, PLAYFUL); if (k <= 0) return;
+    const tx = i % 2 ? 300 : 780, ty = 1020 + Math.floor(i / 2) * 260;
+    pouch(lerp(540, tx, clamp(k * 1.2)), lerp(700, ty, clamp(k * 1.2)), (0.4 + 0.6 * k) * 1.55, POUCH_ITEMS[i], t);
+    const d = t - ti; if (d < 0.8) drawT(ptext('+1', { size: 12, weight: 400, family: 'Press Start 2P', color: '#F7C948', shadow: C.ink, shadowOff: 1 }), tx + 170, ty - 120 - d * 120, 4, { alpha: clamp(1.6 - d * 2) });
+  });
+  const dk = sp(t - 13.4, SNAPPY);
+  if (dk > 0) { g.save(); g.translate(540, 1530); g.rotate(-0.04); g.scale(dk, dk); pill(0, 0, 470, 104, C.pink); drawT(ptext('قابلة للفصل', { size: 18, color: C.ivory }), 0, -2, 4); g.restore(); }
+}
+
+// -------- S5 brushes into the lid 15.0–17.8 --------
+function sLid(t) {
+  space(t);
+  wordLine(t, [['جيوب', 15.25], ['للفرش', 15.6]], W / 2, 330, 6, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  // lid close-up: crop the top band of the open-bag photo
+  const im = IMG.open, k = sp(t - 15.05, DEFAULT), sx = 40, sy = 20, sw = 230, sh = 120, w = 880, h = w * sh / sw;
+  g.save(); g.translate(540, 900 + (1 - k) * 600); panel(-w / 2 - 14, -h / 2 - 14, w + 28, h + 28, C.ivory, { so: 14 });
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, sx, sy, sw, sh, -w / 2, -h / 2, w, h); g.restore();
+  const cols = [C.pink, '#D9A93A', C.lav, C.pinkL, '#B0703F', C.lavD];
+  cols.forEach((c, i) => { const ti = 15.4 + i * 0.22, d = t - ti; if (d < -0.3) return;
+    const f = d < 0 ? easeIn((d + 0.3) / 0.3) : 1, tx = 830 - i * 124, ty = 960;
+    brushIcon(lerp(540, tx, f), lerp(1700, ty, f), 10, d < 0 ? (1 - f) * 3 : 0, c); });
+  wordLine(t, [['داخل', 16.5], ['الغطاء', 16.85]], W / 2, 1420, 4.6, { size: 20, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
+}
+
+// -------- S6 the run 17.8–23.6 --------
+function sRun(t) {
+  const T0 = 17.8, d = t - T0, speed = 520;
+  g.fillStyle = C.lavLL; g.fillRect(0, 0, W, H);
+  // skyline layers
+  const r = rng(12);
+  for (const [par, base, col, hmin, hmax] of [[0.3, 1250, C.lavL, 200, 520], [0.6, 1300, C.lav, 160, 420]]) {
+    let x = -((d * speed * par) % 1600); const rr = rng(base);
+    while (x < W + 200) { const w = 120 + rr() * 140, h = hmin + rr() * (hmax - hmin); g.fillStyle = col; g.fillRect(x, base - h, w, h);
+      g.fillStyle = 'rgba(255,255,255,.45)'; for (let wy = base - h + 30; wy < base - 30; wy += 60) for (let wx = x + 20; wx < x + w - 30; wx += 46) if (rr() > 0.4) g.fillRect(wx, wy, 18, 26);
+      x += w + 20; }
+  }
+  g.fillStyle = C.mauve; g.fillRect(0, 1300, W, 620); g.fillStyle = C.mauveD; for (let x = -((d * speed) % 120); x < W; x += 120) g.fillRect(x, 1300, 60, 16);
+  // progress bar to the hall
+  const prog = clamp(d / 5.6);
+  g.fillStyle = C.ink; g.fillRect(140, 290, 800, 40); g.fillStyle = C.pink; g.fillRect(146, 296, 788 * prog, 28);
+  drawT(ptext('قاعة الزواج', { size: 14, color: C.mauve }), 870, 370, 3.4);
+  drawAv('face_neutral', 146 + 788 * prog, 300, 0.32, { ax: 0.5 });
+  clockPill(250, 470, '5:' + String(30 + Math.floor(prog * 15)).padStart(2, '0') + 'PM', 1);
+  // her walk cycle pulling the real bag
+  const frame = Math.floor(d * 8) % 4, bob = Math.abs(Math.sin(d * Math.PI * 4)) * 10;
+  const hk = sp(t - 18.25, PLAYFUL);
+  g.save(); g.translate(300, 1625 - bob * 0.5); g.rotate(0.22); photo('bag_handle', 0, -250, 420, { shadow: false }); g.restore();
+  drawAv('walk' + frame, 680, 1640 - bob, 3.25);
+  if (t > 18.25 && t < 19.2) drawT(ptext('CLICK!', { size: 10, weight: 400, family: 'Press Start 2P', color: C.ivory, outline: C.ink }), 300, 980, 5, { sc: hk, rot: -0.1 });
+  // wheel close-up callout
+  const wk = sp(t - 19.1, PLAYFUL);
+  if (wk > 0) { g.save(); g.translate(850, 770); g.scale(wk, wk);
+    g.beginPath(); g.arc(0, 0, 170, 0, Math.PI * 2); g.fillStyle = C.ink; g.fill(); g.beginPath(); g.arc(0, 0, 158, 0, Math.PI * 2); g.clip();
+    const im = IMG.wheel; g.drawImage(im, -170, -190, 340, 340 * im.height / im.width); g.restore();
+    g.save(); g.translate(850, 770); g.rotate(t * 5); g.strokeStyle = C.pink; g.lineWidth = 10; g.setLineDash([30, 22]); g.beginPath(); g.arc(0, 0, 185 * wk, 0, Math.PI * 2); g.stroke(); g.restore(); }
+  if (t < 20.3) wordLine(t, [['مقبض', 18.15], ['يطول', 18.55]], 400, 620, 4.0, { size: 20, color: C.mauve, shadow: C.lav, shadowOff: 2 });
+  else wordLine(t, [['تمشين', 20.5], ['فيها', 20.95], ['براحتك', 21.2]], 380, 620, 3.3, { size: 20, color: C.mauve, shadow: C.lav, shadowOff: 2 });
+}
+
+// -------- S7 mission complete 23.6–26.6 --------
+function sDone(t) {
+  space(t, C.mauve);
+  rays(540, 1000, 1100, t, clamp((t - 23.7) * 3) * 0.7);
+  arch(540, 520, 600, 900, C.lavL);
+  g.fillStyle = C.lav; g.fillRect(250, 900, 580, 520); g.fillStyle = C.ink; g.fillRect(536, 900, 8, 520);
+  const fk = sp(t - 23.75, PLAYFUL);
+  drawAv('front', 400, 1640, 1.75 * (0.7 + 0.3 * fk), { alpha: clamp(fk * 3) });
+  photo('bag', 760, 1470, 380 * (0.6 + 0.4 * sp(t - 23.9, PLAYFUL)), { shadow: true });
+  const mk = sp(t - 23.95, SNAPPY);
+  if (mk > 0) { g.save(); g.translate(540, 320); g.scale(mk, mk); pill(0, 0, 900, 130, '#F7C948');
+    drawT(ptext('MISSION COMPLETE', { size: 12, weight: 400, family: 'Press Start 2P', color: C.ink }), 0, 0, 4); g.restore(); }
+  for (let i = 0; i < 3; i++) { const ti = 24.4 + i * 0.18, on = t >= ti, k = sp(t - ti, PLAYFUL); drawSpr(star5(on), 540 + (i - 1) * 140, 460, on ? 8 * (0.7 + 0.3 * k) : 8); }
+  wordLine(t, [['ووصلت', 24.0], ['قبل', 24.55], ['العروس!', 24.8]], W / 2, 610, 3.8, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  clockPill(830, 760, '5:45PM', sp(t - 25.2, PLAYFUL));
+}
+
+// -------- S8 lockup 26.6–31.6 --------
+function sLock(t) {
+  const T0 = 26.6, wk = easeOut((t - T0) / 0.45), off = (1 - wk) * W;
+  g.fillStyle = C.mauve; g.fillRect(off, 0, W, H);
+  const fl = flowerTile(), dr = (t - T0) * 18;
+  g.save(); g.beginPath(); g.rect(off, 0, W, H); g.clip();
+  for (let y = -200, row = 0; y < H + 200; y += 170, row++) for (let x = -200; x < W + 200; x += 170) {
+    const xx = x + (row % 2) * 85 + off + (dr % 170), yy = y + (dr * 0.5 % 170);
+    g.globalAlpha = 0.7; drawSpr(fl, xx, yy, 6); g.globalAlpha = 1; g.fillStyle = C.pinkD; g.fillRect(xx + 80, yy + 80, 10, 10); }
+  g.restore();
+  const ck = sp(t - 26.78, HEAVY);
+  if (ck > 0) { g.save(); g.translate(540, 950); g.scale(ck, ck);
+    g.fillStyle = C.mauve; g.beginPath(); g.arc(0, 0, 420, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = C.lavD; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 440, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(0, 0, 404, 0, Math.PI * 2); g.stroke(); g.restore(); }
+  const bk2 = sp(t - 26.95, PLAYFUL);
+  if (bk2 > 0) photo('bag', 540, 735, 330 * bk2, { shadow: true });
+  const lk = sp(t - 27.05, HEAVY);
+  if (lk > 0) { const L = IMG.logoW, w = 520 * (0.82 + 0.18 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 3); g.drawImage(L, 540 - w / 2, 935 - h / 2, w, h); g.restore(); }
+  { const words = [['صُنع', 28.45], ['ليعتني', 28.9], ['بجمالك', 29.45]], gap = 20;
+    g.save(); g.font = '800 64px "Cairo"'; const ws = words.map(([w]) => g.measureText(w).width); g.restore();
+    let x = 540 + (ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1)) / 2;
+    words.forEach(([w, ti], i) => { const k = sp(t - ti, SNAPPY); if (k > 0) text(w, x - ws[i] / 2, 1060 + (1 - k) * 30, { size: 64, alpha: clamp(k * 3) }); x -= ws[i] + gap; }); }
+  const bk = sp(t - 30.0, SNAPPY), press = t > 30.75 ? 1 - 0.07 * Math.exp(-(t - 30.75) * 10) * Math.sin(Math.min(Math.PI, (t - 30.75) * 18)) : 1;
+  if (bk > 0) { g.save(); g.translate(540, 1270); g.scale(bk * press, bk * press); pill(0, 0, 640, 130, C.pink); text('اطلبيها من karaduo.com', 0, -4, { size: 44, weight: 800 }); g.restore(); }
+  const uk = sp(t - 30.2, DEFAULT);
+  if (uk > 0) { g.save(); g.globalAlpha = clamp(uk * 2); drawT(ptext('البكجات ← شنطة الميكب', { size: 14, color: C.lavL }), 540, 1405, 3.2); g.restore(); }
+  if (t > 30.25) { const mk = easeOut((t - 30.25) / 0.45); drawSpr(hand(), lerp(1000, 760, mk), lerp(1700, 1282, mk), 7, 0.2, 0.05); }
+  if (t > 30.77 && t < 31.25) { const d = t - 30.77; g.strokeStyle = C.ivory; g.lineWidth = 8 * (1 - d / 0.48); g.beginPath(); g.arc(777, 1287, 30 + d * 260, 0, Math.PI * 2); g.stroke(); }
+}
+
+const SCENES = [[0, 3.3, sChaos], [3.3, 6.4, sMission], [6.4, 11.2, sTetris], [11.2, 15.0, sPouches], [15.0, 17.8, sLid], [17.8, 23.6, sRun], [23.6, 26.6, sDone], [26.6, 31.61, sLock]];
+const WIPES = [[3.3, C.mauveDD], [11.2, C.lav], [17.8, C.lavL], [23.6, C.pink]];
+
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = true;
+  const [sx, sy] = shake(t);
+  g.save(); g.translate(sx, sy);
+  for (const [a, b, fn] of SCENES) if (t >= a && t < b) fn(t);
+  drawHost(t);
+  g.restore();
+  for (const [tc, col] of WIPES) blockWipe(t, tc, col);
+}
+
+window.__ready = false;
+window.seek = (t) => { draw(t); return true; };
+(async () => {
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('bag', 'assets/bag.png'), loadImg('bag_handle', 'assets/bag_handle.png'), loadImg('wheel', 'assets/wheel.png'), loadImg('open', 'assets/open.png'),
+    ...CHAOS.map((id) => loadImg(id, `assets/prod/${id}.png`)),
+    loadImg('av_front', 'assets/avatar/front.png'), ...FACES3.map((f) => loadImg('av_face_' + f, `assets/avatar/face_${f}.png`)), ...[0, 1, 2, 3].map((i) => loadImg('av_walk' + i, `assets/avatar/walk${i}.png`))]);
+  IMG.logoW = tint(IMG.logo, C.ivory);
+  await Promise.all(['900 20px Cairo', '800 20px Cairo', '700 20px Cairo', '20px "Press Start 2P"', '500 20px Montserrat', '600 20px Montserrat', '700 20px Montserrat', '20px Allura'].map((f) => document.fonts.load(f, 'abcأب٠')));
+  await document.fonts.ready;
+  window.__ready = true; draw(0);
+  if (!navigator.webdriver) { const t0 = performance.now(); (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })(); }
+})();
+</script>
