@@ -1,0 +1,37 @@
+[project]
+name = "video-agent"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "av>=14.0.0",
+    "mlx-whisper>=0.4.3",
+    "pillow>=12.2.0",
+    "python-dotenv>=1.2.2",
+    "yt-dlp>=2026.3.17",
+]
+
+[project.optional-dependencies]
+# Generative VFX backends (cloud, paid, optional). The editing core needs none of these.
+# Install with: uv sync --extra vfx   (or: pip install 'video-agent[vfx]')
+vfx = [
+    "xai-sdk>=1.15.0",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+video-agent = "video_agent:main"
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["video_agent"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
