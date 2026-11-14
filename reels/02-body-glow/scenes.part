@@ -1,0 +1,298 @@
+// ================= SCENES =================
+// space-y pixel stage (the shades are Lunar / Galaxy / Cosmic / Moon)
+function space(t, base = C.mauveDD) {
+  g.fillStyle = base; g.fillRect(0, 0, W, H);
+  const r = rng(77);
+  for (let i = 0; i < 70; i++) {
+    const x = r() * W, y = r() * H, s = r() < 0.15 ? 10 : 6, tw = Math.sin(t * (2 + r() * 3) + i);
+    if (tw > -0.3) { g.fillStyle = i % 9 === 0 ? C.pinkL : i % 4 === 0 ? C.lav : C.lavL; g.globalAlpha = 0.35 + 0.5 * (tw + 0.3) / 1.3; g.fillRect(x, (y + t * 14 * (s / 6)) % H, s, s); }
+  }
+  g.globalAlpha = 1;
+}
+function photo(key, cx, cy, w, { rot = 0, alpha = 1, frame = null, shadow = true } = {}) {
+  const im = IMG[key]; if (!im) return; const h = w * im.height / im.width;
+  g.save(); g.globalAlpha *= alpha; g.translate(cx, cy); g.rotate(rot); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  if (frame) panel(-w / 2 - 14, -h / 2 - 14, w + 28, h + 28, frame, { so: 14 });
+  if (shadow && !frame) { g.shadowColor = 'rgba(20,10,28,.5)'; g.shadowBlur = 34; g.shadowOffsetY = 18; }
+  g.drawImage(im, -w / 2, -h / 2, w, h); g.restore();
+  return h;
+}
+// pixel treasure chest (lid angle 0 = closed, 1 = open)
+function chest(cx, by, s, open, glow) {
+  const P = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(cx + x * s, by + y * s, w * s, h * s); };
+  // base
+  P(-26, -20, 52, 20, C.ink); P(-25, -19, 50, 18, C.mauve); P(-25, -19, 50, 3, '#7B5C88');
+  P(-26, -11, 52, 3, C.pink); P(-20, -19, 3, 18, C.pinkD); P(17, -19, 3, 18, C.pinkD);
+  // light from inside
+  if (open > 0.05) { g.save(); g.globalAlpha = clamp(open) * (0.6 + 0.4 * glow); P(-24, -24, 48, 6, '#FFF3C4'); g.restore(); }
+  // lid: hinged at the back top edge, squashes upward as it opens
+  const lh = lerp(12, -2, clamp(open)), ly = -20 - Math.max(0, lh);
+  if (lh > 0.5) { P(-26, ly - 1, 52, lh + 1, C.ink); P(-25, ly, 50, lh, C.mauve); P(-25, ly, 50, 2, '#7B5C88'); P(-20, ly, 3, lh, C.pinkD); P(17, ly, 3, lh, C.pinkD); }
+  else { P(-26, -34, 52, 12, C.ink); P(-25, -33, 50, 10, '#7B5C88'); P(-25, -33, 50, 3, C.lavD); P(-20, -33, 3, 10, C.pinkD); P(17, -33, 3, 10, C.pinkD); }
+  // star lock
+  if (open < 0.2) { P(-4, -14, 8, 7, C.ink); P(-3, -13, 6, 5, '#F7C948'); P(-1, -12, 2, 2, C.ink); }
+}
+// pixel potion bottle tinted to a shade
+function bottle(cx, cy, s, col, hi) {
+  const B = ['...##...', '...##...', '..####..', '.#oooo#.', '#oohooo#', '#ohhooo#', '#oohooo#', '#oooooo#', '#oooooo#', '.######.'];
+  B.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === '.') return;
+    g.fillStyle = ch === '#' ? C.ink : ch === 'h' ? hi : col; g.fillRect(cx + (x - 4) * s, cy + (y - 5) * s, s, s); }));
+  g.fillStyle = C.lavD; g.fillRect(cx - 2 * s, cy - 5 * s, 4 * s, 2 * s);
+}
+function rays(cx, cy, r, t, alpha) {
+  g.save(); g.translate(cx, cy); g.rotate(t * 0.5); g.globalAlpha = alpha;
+  for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? 'rgba(255,243,196,.55)' : 'rgba(243,195,220,.35)';
+    g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r, i * Math.PI / 6, i * Math.PI / 6 + Math.PI / 12); g.closePath(); g.fill(); }
+  g.restore();
+}
+
+// ---------- host ----------
+function hostFace(t) {
+  let f = 'neutral';
+  if (t < 5.5) f = 'oh'; else if (t < 8.2) f = 'laugh'; else if (t < 12.6) f = t > 9.4 ? 'love' : 'oh';
+  else if (t < 15.2) f = 'neutral'; else if (t < 19.6) f = 'think'; else if (t < 23) f = 'love'; else f = 'selfie';
+  if ((f === 'neutral' || f === 'think') && vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0) f = 'oh';
+  return f;
+}
+function drawHost(t) {
+  if (t < 2.8 || t >= 29.6) return;
+  const k = sp(t - 2.8, PLAYFUL), bob = Math.sin(t * 4.2) * 4;
+  drawAv('face_' + hostFace(t), 170, 1935 + (1 - k) * 320 + bob, 1.55);
+}
+
+// -------- S1 hook 0–2.8 --------
+function sHook(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  const lk = sp(t - 0.08, SNAPPY);
+  if (lk > 0) { const L = IMG.logoW, w = 520 * (0.7 + 0.3 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 2); g.drawImage(L, W / 2 - w / 2, 330 - h / 2, w, h); g.restore(); }
+  wordLine(t, [['عندي', 0.35], ['زواج…', 0.75]], W / 2, 560, 5, { size: 24, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  wordLine(t, [['وأبي', 1.55], ['ألمع!', 1.9]], W / 2, 720, 6, { size: 24, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
+  const bk = sp(t, [180, 20]), out = easeIn((t - 2.55) / 0.3);
+  const face = vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0 ? 'face_laugh' : 'face_selfie';
+  drawAv(face, 540, 1960 + (1 - bk) * 160 + out * 1100 + Math.sin(t * 3) * 6, 4.6);
+  const r = rng(8);
+  for (let i = 0; i < 6; i++) { const ti = 1.9 + i * 0.08, k = sp(t - ti, PLAYFUL); if (k > 0) drawSpr(sparkle(i % 2 ? C.pink : C.ivory, i % 2 ? C.ivory : C.pink), 160 + r() * 760, 860 + r() * 260, 7 * k * (0.8 + 0.4 * Math.sin(t * 8 + i))); }
+}
+
+// -------- S2 LEVEL 2 + chest drops 2.8–5.5 --------
+function sChest(t) {
+  space(t);
+  const bk = sp(t - 2.85, SNAPPY);
+  if (bk > 0) { g.save(); g.translate(lerp(1300, 540, bk), 330); g.rotate(-0.03); pill(0, 0, 560, 130, C.pink);
+    drawT(ptext('LEVEL 2', { size: 16, weight: 400, family: 'Press Start 2P', color: C.ivory, shadow: C.pinkD, shadowOff: 2 }), 0, 0, 4); g.restore(); }
+  wordLine(t, [['صندوق', 3.5], ['كارا', 3.85], ['دو', 4.05]], W / 2, 520, 5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  const dk = sp(t - 3.3, [180, 12]), y = lerp(-300, 1350, dk);
+  g.save(); g.fillStyle = 'rgba(20,10,28,.45)'; g.beginPath(); g.ellipse(540, 1360, 300 * clamp(dk), 40 * clamp(dk), 0, 0, Math.PI * 2); g.fill(); g.restore();
+  chest(540, y, 14, 0, 0);
+}
+
+// -------- S3 open 5.5–8.2 --------
+function sOpen(t) {
+  space(t);
+  wordLine(t, [['يلا', 5.72], ['نفتحه!', 6.0]], W / 2, 320, 6, { size: 24, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  const taps = [5.6, 5.95, 6.3]; let sq = 0;
+  for (const ti of taps) { const d = t - ti; if (d > 0 && d < 0.25) sq = Math.sin(d / 0.25 * Math.PI) * 0.06; }
+  const open = easeOut((t - 6.75) / 0.25), glow = Math.abs(Math.sin(t * 5));
+  if (t > 6.75) rays(540, 1150, 900, t, clamp((t - 6.75) * 4) * 0.9);
+  g.save(); g.translate(540, 1350); g.scale(1 + sq, 1 - sq); g.translate(-540, -1350); chest(540, 1350, 14, open, glow); g.restore();
+  taps.forEach((ti, i) => { const k = sp(t - ti, PLAYFUL); if (k > 0 && t < 6.75) drawT(ptext(['٣', '٢', '١'][i], { size: 22, color: '#F7C948', shadow: C.ink, shadowOff: 2 }), 540 - (i - 1) * 180, 900 - 60 * k, 5, { sc: k, alpha: clamp(1.4 - (t - ti) * 1.6) }); });
+  // the real box rises out
+  const bx = sp(t - 6.85, [140, 16]);
+  if (bx > 0) photo('box', 540, lerp(1250, 900, bx), lerp(200, 620, clamp(bx)));
+  if (t > 6.8) { const r = rng(4); for (let i = 0; i < 12; i++) { const a = r() * Math.PI * 2, d = easeOut((t - 6.8) / 0.8) * (300 + r() * 300);
+    if (t < 7.7) drawSpr(sparkle(i % 2 ? C.pink : '#F7C948'), 540 + Math.cos(a) * d, 900 + Math.sin(a) * d, 7 * (1 - (t - 6.8) / 0.9)); } }
+}
+
+// -------- S4 four shades collected 8.2–12.6 --------
+const SHADES = [
+  ['LUNAR GLOW', 'فضي', '#D9DCE6', '#FFFFFF', 9.45],
+  ['GALAXY KISS', 'برونزي', '#B0703F', '#E0A877', 9.95],
+  ['COSMIC SHINE', 'ذهبي', '#D9A93A', '#F7DC8A', 10.55],
+  ['MOON BEAM', 'وردي', '#E98ABC', '#F8C6E0', 11.32],
+];
+function shadeCard(i, cx, cy, sc, t) {
+  const [en, ar, col, hi] = SHADES[i];
+  g.save(); g.translate(cx, cy); g.scale(sc, sc);
+  panel(-200, -125, 400, 250, C.ivory, { so: 10 });
+  g.fillStyle = col; g.fillRect(-194, -119, 388, 14);
+  bottle(-120, 8, 14, col, hi);
+  drawT(ptext(ar, { size: 22, color: C.mauve }), 70, -32, 4);
+  drawT(ptext(en, { size: 7, weight: 400, family: 'Press Start 2P', color: C.pinkD }), 70, 50, 3);
+  g.restore();
+}
+function sItems(t) {
+  space(t);
+  const sk = sp(t - 8.2, DEFAULT);
+  photo('box', 540, lerp(860, 610, sk), lerp(640, 400, sk));
+  wordLine(t, [['أربع', 8.45], ['لمعات', 8.8]], W / 2, 290, 6, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  SHADES.forEach((s, i) => {
+    const ti = s[4], k = sp(t - ti, PLAYFUL); if (k <= 0) return;
+    const tx = i % 2 ? 300 : 780, ty = 1010 + Math.floor(i / 2) * 290;
+    shadeCard(i, lerp(540, tx, clamp(k * 1.2)), lerp(700, ty, clamp(k * 1.2)), 0.4 + 0.6 * k, t);
+    const pk = t - ti; if (pk < 0.8) drawT(ptext('+1', { size: 12, weight: 400, family: 'Press Start 2P', color: '#F7C948', shadow: C.ink, shadowOff: 1 }), tx + 150, ty - 120 - pk * 120, 4, { alpha: clamp(1.6 - pk * 2) });
+  });
+}
+
+// -------- S5 bonus brush 12.6–15.2 --------
+function sBrush(t) {
+  space(t);
+  SHADES.forEach((s, i) => shadeCard(i, 200 + i * 227, 400, 0.5, t));
+  const k = sp(t - 12.85, PLAYFUL), spin = (1 - clamp(k)) * Math.PI * 1.5;
+  g.save(); g.translate(540, 1000); g.scale(Math.cos(spin) || 0.01, 1); g.scale(0.5 + 0.5 * k, 0.5 + 0.5 * k);
+  panel(-280, -300, 560, 600, C.ivory, { so: 14 });
+  g.fillStyle = C.pinkLL; g.fillRect(-266, -286, 532, 470);
+  const im = IMG.brush, iw = 400, ih = iw * im.height / im.width; g.imageSmoothingEnabled = true; g.drawImage(im, -iw / 2, -110 - ih / 2, iw, ih);
+  drawT(ptext('فرشاة الجسم', { size: 20, color: C.mauve }), 0, 240, 4);
+  g.restore();
+  const st = sp(t - 13.6, SNAPPY);
+  if (st > 0) { g.save(); g.translate(780, 720); g.rotate(-0.25); g.scale(lerp(2.4, 1, st), lerp(2.4, 1, st)); g.globalAlpha = clamp(st * 5);
+    panel(-150, -60, 300, 120, C.pink, { border: C.ivory, bw: 8, so: 0 });
+    drawT(ptext('BONUS', { size: 12, weight: 400, family: 'Press Start 2P', color: C.ivory }), 0, 0, 4); g.restore(); }
+  wordLine(t, [['تدمجها', 13.95], ['لك', 14.35], ['بسهولة', 14.55]], W / 2, 1420, 4.5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+}
+
+// -------- S6 swatches: alone or mixed 15.2–19.6 --------
+function sSwatch(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  const k = sp(t - 15.25, DEFAULT);
+  const h = photo('swatch', 540, 880 + (1 - k) * 900, 760, { frame: C.ivory });
+  // shine sweeps across the swatches
+  for (const ts of [15.7, 17.0]) { const d = (t - ts) / 0.7; if (d > 0 && d < 1) {
+    g.save(); g.beginPath(); g.rect(160, 880 - h / 2, 760, h); g.clip(); g.translate(lerp(-200, 1300, d), 880); g.rotate(0.35);
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(-60, -900, 120, 1800); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(-14, -900, 28, 1800); g.restore(); } }
+  // toggle chips
+  const mixed = t > 16.75, ck = sp(t - 15.5, SNAPPY);
+  if (ck > 0) { g.save(); g.translate(540, 1390); g.scale(ck, ck);
+    pill(170, 0, 300, 110, mixed ? C.mauveDD : C.pink); drawT(ptext('لحالها', { size: 18, color: C.ivory }), 170, -2, 4);
+    pill(-170, 0, 300, 110, mixed ? C.pink : C.mauveDD); drawT(ptext('ادمجيها', { size: 18, color: C.ivory }), -170, -2, 4);
+    g.restore(); }
+  if (t > 16.75 && t < 17.3) { const d = (t - 16.75) / 0.55; g.strokeStyle = C.ivory; g.lineWidth = 8 * (1 - d); g.beginPath(); g.arc(370, 1390, 40 + d * 200, 0, Math.PI * 2); g.stroke(); }
+  if (t < 16.6) wordLine(t, [['حطيها', 15.55], ['لحالها…', 15.95]], W / 2, 330, 5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  else wordLine(t, [['أو', 16.72], ['ادمجي', 16.95], ['الألوان', 17.35]], W / 2, 330, 5, { size: 22, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
+}
+
+// -------- S7 real review 19.6–23.0 --------
+function sReview(t) {
+  space(t, C.mauve);
+  const bk = sp(t - 19.75, PLAYFUL);
+  if (bk > 0) { g.save(); g.translate(540, 880); g.scale(bk, bk); g.translate(-540, -880);
+    bubble(540, 860, 860, 520, 380, 1240);
+    drawT(ptext('والبنات يقولون…', { size: 16, color: C.lavD }), 540, 680, 4);
+    const qk = sp(t - 21.2, SNAPPY);
+    if (qk > 0) { text('«يجنن فوق المتوقع»', 540, 840 + (1 - qk) * 20, { size: 76, weight: 900, color: C.mauve, alpha: clamp(qk * 3) }); }
+    for (let i = 0; i < 5; i++) { const ti = 21.5 + (4 - i) * 0.12, on = t >= ti, k = sp(t - ti, PLAYFUL);
+      drawSpr(star5(on), 540 + (i - 2) * 112, 990, on ? 7 * (0.7 + 0.3 * k) : 7); }
+    g.restore(); }
+  const sk = sp(t - 22.2, SNAPPY);
+  if (sk > 0) { g.save(); g.translate(800, 1330); g.rotate(-0.12); g.scale(sk, sk); pill(0, 0, 330, 110, C.pink); drawT(ptext('٥٫٠ ★', { size: 20, color: C.ivory }), 0, -2, 4); g.restore(); }
+  photo('box', 300, 1380 + (1 - sp(t - 20, DEFAULT)) * 500, 300);
+}
+
+// -------- S8 how to order 23.0–29.6 --------
+const STEPS = [['karaduo.com', 23.3], ['البكجات', 25.3], ['أضيفي للسلة', 26.4], ['يوصلك لين بابك', 27.5]];
+function phone(cx, top, w, key, { cropH = null, scroll = 0 } = {}) {
+  const im = IMG[key], s = w / im.width, h = 932 * 2 * s;
+  panel(cx - w / 2 - 22, top - 22, w + 44, h + 44, C.ink, { border: C.ink, so: 16, step: 30 });
+  g.save(); g.beginPath(); g.rect(cx - w / 2, top, w, h); g.clip();
+  g.fillStyle = '#F3ECF6'; g.fillRect(cx - w / 2, top, w, h);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  const sh = cropH ? cropH : im.height;
+  g.drawImage(im, 0, 0, im.width, sh, cx - w / 2, top - scroll, w, sh * s);
+  g.restore();
+  return { s: s / 2, x0: cx - w / 2, y0: top };                 // s maps 430-wide CSS px to canvas px
+}
+function tapAt(x, y, t, ti) { const d = t - ti; if (d < -0.45 || d > 0.6) return;
+  const k = easeOut((d + 0.45) / 0.45); drawSpr(hand(), lerp(x + 260, x, k), lerp(y + 300, y, k), 7, 0.2, 0.05);
+  if (d > 0 && d < 0.45) { g.strokeStyle = C.pink; g.lineWidth = 8 * (1 - d / 0.45); g.beginPath(); g.arc(x, y, 20 + d * 160, 0, Math.PI * 2); g.stroke(); } }
+function sOrder(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  // current step: one big pill that swaps on each step, with progress dots
+  let cur = 0; STEPS.forEach(([, ti], i) => { if (t >= ti) cur = i; });
+  const [lab, ti] = STEPS[cur], k = sp(t - ti, PLAYFUL);
+  g.save(); g.translate(540, 300); g.scale(0.6 + 0.4 * k, 0.6 + 0.4 * k);
+  const latin = lab === 'karaduo.com', tc = latin ? null : ptext(lab, { size: 18, color: C.ivory });
+  const tw = latin ? 600 : tc.width * 4.2 + 190;
+  pill(0, 0, tw, 120, C.pink);
+  g.fillStyle = C.ivory; g.beginPath(); g.arc(tw / 2 - 62, 0, 36, 0, Math.PI * 2); g.fill();
+  drawT(ptext(AR(cur + 1), { size: 16, color: C.pink }), tw / 2 - 62, -1, 3.4);
+  if (latin) text('karaduo.com', -45, -2, { size: 50, weight: 700, family: 'Montserrat' }); else drawT(tc, -40, -2, 4.2);
+  g.restore();
+  STEPS.forEach((_, i) => { g.fillStyle = i <= cur ? C.pink : C.mauveDD; g.fillRect(540 + (1.5 - i) * 46 - 12, 385, 24, 24); });
+  const pk = sp(t - 23.05, DEFAULT), top = 440 + (1 - pk) * 1500, w = 500;
+  let key = 'p_home', crop = null, scroll = 0;
+  if (t >= 25.75 && t < 26.5) { key = 'p_product'; crop = 1600; }
+  else if (t >= 26.5) key = 'p_add';
+  const ph = phone(540, top, w, key, { cropH: crop, scroll });
+  const X = (x) => ph.x0 + x * ph.s * 2 / 2 * 2 / 2 * 2, Y = (y) => ph.y0 + y * ph.s * 2 / 2 * 2 / 2 * 2;
+  // taps: the "البكجات" category, then "إضافة للسلة"
+  if (key === 'p_home') tapAt(X(350), Y(625), t, 25.45);
+  if (key === 'p_add') tapAt(X(215), Y(465), t, 26.75);
+  // added-to-cart toast + badge
+  if (t > 26.8) { const k = sp(t - 26.8, PLAYFUL); g.save(); g.translate(540, top + 190); g.scale(k, k); pill(0, 0, 560, 110, C.mauveDD);
+    drawT(ptext('أُضيف للسلة', { size: 18, color: C.ivory }), 0, -2, 4); g.restore();
+    g.fillStyle = C.pink; g.beginPath(); g.arc(X(50), Y(52), 22 * k, 0, Math.PI * 2); g.fill(); drawT(ptext('١', { size: 12, color: C.ivory }), X(50), Y(52), 3, { sc: k }); }
+  // delivery
+  if (t > 27.45) { const k = sp(t - 27.45, SNAPPY); g.save(); g.translate(540, 1480); g.scale(k, k); pill(0, 0, 900, 120, C.pink);
+    drawT(ptext('الرياض خلال يومين · الخليج خلال ٥ أيام', { size: 16, color: C.ivory }), 0, -2, 3.0); g.restore(); }
+}
+
+// -------- S9 lockup 29.6–34.4 --------
+function sLock(t) {
+  const T0 = 29.6, wk = easeOut((t - T0) / 0.45), off = (1 - wk) * W;
+  g.fillStyle = C.mauve; g.fillRect(off, 0, W, H);
+  const fl = flowerTile(), dr = (t - T0) * 18;
+  g.save(); g.beginPath(); g.rect(off, 0, W, H); g.clip();
+  for (let y = -200, row = 0; y < H + 200; y += 170, row++) for (let x = -200; x < W + 200; x += 170) {
+    const xx = x + (row % 2) * 85 + off + (dr % 170), yy = y + (dr * 0.5 % 170);
+    g.globalAlpha = 0.7; drawSpr(fl, xx, yy, 6); g.globalAlpha = 1; g.fillStyle = C.pinkD; g.fillRect(xx + 80, yy + 80, 10, 10); }
+  g.restore();
+  const ak = sp(t - 30.2, PLAYFUL);
+  if (ak > 0) { const face = t > 33.2 ? 'wink' : (vo(t) > 0.16 && Math.floor(t * 12) % 2 === 0 ? 'oh' : 'neutral');
+    drawAv('face_' + face, 540, 590 + (1 - ak) * 300 + Math.sin(t * 3) * 4, 1.9);
+    if (t > 33.2) drawSpr(sparkle(), 735, 380, 7 * sp(t - 33.25, PLAYFUL)); }
+  const ck = sp(t - 29.78, HEAVY);
+  if (ck > 0) { g.save(); g.translate(540, 950); g.scale(ck, ck);
+    g.fillStyle = C.mauve; g.beginPath(); g.arc(0, 0, 420, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = C.lavD; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 440, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(0, 0, 404, 0, Math.PI * 2); g.stroke(); g.restore(); }
+  const nk = sp(t - 30.05, SNAPPY);
+  if (nk > 0) text('Body Glow', 540, 765, { size: 104, weight: 400, family: 'Allura', color: C.pinkLL, alpha: clamp(nk * 3) });
+  const lk = sp(t - 30.6, HEAVY);
+  if (lk > 0) { const L = IMG.logoW, w = 560 * (0.82 + 0.18 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 3); g.drawImage(L, 540 - w / 2, 880 - h / 2, w, h); g.restore(); }
+  { const words = [['صُنع', 31.85], ['ليعتني', 32.3], ['بجمالك', 32.85]], gap = 22;
+    g.save(); g.font = '800 70px "Cairo"'; const ws = words.map(([w]) => g.measureText(w).width); g.restore();
+    let x = 540 + (ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1)) / 2;
+    words.forEach(([w, ti], i) => { const k = sp(t - ti, SNAPPY); if (k > 0) text(w, x - ws[i] / 2, 1015 + (1 - k) * 30, { size: 70, alpha: clamp(k * 3) }); x -= ws[i] + gap; }); }
+  const bk = sp(t - 33.0, SNAPPY), press = t > 33.7 ? 1 - 0.07 * Math.exp(-(t - 33.7) * 10) * Math.sin(Math.min(Math.PI, (t - 33.7) * 18)) : 1;
+  if (bk > 0) { g.save(); g.translate(540, 1250); g.scale(bk * press, bk * press); pill(0, 0, 600, 130, C.pink); text('اكتشفي Body Glow', 0, -4, { size: 50, weight: 800 }); g.restore(); }
+  const uk = sp(t - 33.1, DEFAULT);
+  if (uk > 0) text('karaduo.com', 540, 1395, { size: 36, weight: 600, family: 'Montserrat', color: C.lavL, alpha: clamp(uk * 2) });
+  if (t > 33.2) { const mk = easeOut((t - 33.2) / 0.45); drawSpr(hand(), lerp(1000, 700, mk), lerp(1700, 1262, mk), 7, 0.2, 0.05); }
+  if (t > 33.72 && t < 34.2) { const d = t - 33.72; g.strokeStyle = C.ivory; g.lineWidth = 8 * (1 - d / 0.48); g.beginPath(); g.arc(717, 1267, 30 + d * 260, 0, Math.PI * 2); g.stroke(); }
+}
+
+const SCENES = [[0, 2.8, sHook], [2.8, 5.5, sChest], [5.5, 8.2, sOpen], [8.2, 12.6, sItems], [12.6, 15.2, sBrush], [15.2, 19.6, sSwatch], [19.6, 23.0, sReview], [23.0, 29.6, sOrder], [29.6, 34.41, sLock]];
+const WIPES = [[2.8, C.mauveDD], [15.2, C.lav], [19.6, C.pink], [23.0, C.lavL]];
+
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = true;
+  const [sx, sy] = shake(t);
+  g.save(); g.translate(sx, sy);
+  for (const [a, b, fn] of SCENES) if (t >= a && t < b) fn(t);
+  drawHost(t);
+  g.restore();
+  for (const [tc, col] of WIPES) blockWipe(t, tc, col);
+}
+
+window.__ready = false;
+window.seek = (t) => { draw(t); return true; };
+(async () => {
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('box', 'assets/box.png'), loadImg('brush', 'assets/brush.png'), loadImg('swatch', 'assets/swatch.png'),
+    loadImg('p_home', 'assets/01_home.png'), loadImg('p_product', 'assets/03_product.png'), loadImg('p_add', 'assets/04_addtocart.png'),
+    loadImg('av_bust', 'assets/avatar/bust.png'), loadImg('av_front', 'assets/avatar/front.png'), ...FACES.map((f) => loadImg('av_face_' + f, `assets/avatar/face_${f}.png`))]);
+  IMG.logoW = tint(IMG.logo, C.ivory);
+  await Promise.all(['900 20px Cairo', '800 20px Cairo', '700 20px Cairo', '20px "Press Start 2P"', '500 20px Montserrat', '600 20px Montserrat', '700 20px Montserrat', '20px Allura'].map((f) => document.fonts.load(f, 'abcأب٠')));
+  await document.fonts.ready;
+  window.__ready = true; draw(0);
+  if (!navigator.webdriver) { const t0 = performance.now(); (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })(); }
+})();
+</script>
