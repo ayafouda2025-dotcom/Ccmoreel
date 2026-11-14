@@ -9,10 +9,11 @@ const ff = (args, input) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel',
 
 // ---------- 1. voice: cut each line and place it on the timeline ----------
 {
-  const parts = TL.vo_segments.map(([s, e, d], i) =>
-    `[0:a]atrim=${s}:${e},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,afade=t=out:st=${(e - s - 0.06).toFixed(3)}:d=0.06,adelay=${Math.round(d * 1000)}:all=1[v${i}]`);
+  const srcs = [...new Set(TL.vo_segments.map((sg) => sg[3] || TL.vo_src))];
+  const parts = TL.vo_segments.map(([s, e, d, src], i) =>
+    `[${srcs.indexOf(src || TL.vo_src)}:a]aresample=${SR},atrim=${s}:${e},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,afade=t=out:st=${(e - s - 0.06).toFixed(3)}:d=0.06,adelay=${Math.round(d * 1000)}:all=1[v${i}]`);
   const mix = TL.vo_segments.map((_, i) => `[v${i}]`).join('') + `amix=inputs=${TL.vo_segments.length}:normalize=0,apad=whole_dur=${DUR},atrim=0:${DUR}[vo]`;
-  ff(['-i', TL.vo_src, '-filter_complex', parts.join(';') + ';' + mix, '-map', '[vo]', '-ar', SR, '-ac', '1', 'audio/vo.wav']);
+  ff([...srcs.flatMap((f) => ['-i', f]), '-filter_complex', parts.join(';') + ';' + mix, '-map', '[vo]', '-ar', SR, '-ac', '1', 'audio/vo.wav']);
 }
 
 // ---------- 2. mouth envelope for lip flap (60 per second) ----------
@@ -72,8 +73,8 @@ function writeWav(path, chans) {
     }
   }
   // drop: one bright chime + warm pad under the lockup
-  [72, 76, 79, 84].forEach((m, i) => add(M, END + i * 0.06, 2.5, (x) => sq(mtof(m) * x, 0.5) * Math.exp(-x * 2.2) * 0.05));
-  [53, 57, 60, 64].forEach((m) => add(M, END + 0.2, DUR - END, (x) => tri(mtof(m) * x) * Math.min(1, x * 1.5) * Math.min(1, (DUR - END - 0.2 - x) * 1.2) * 0.06));
+  [72, 76, 79, 84].forEach((m, i) => add(M, END + i * 0.06, 2.5, (x) => sq(mtof(m) * x, 0.5) * Math.exp(-x * 2.2) * 0.025));
+  [53, 57, 60, 64].forEach((m) => add(M, END + 0.2, DUR - END, (x) => tri(mtof(m) * x) * Math.min(1, x * 1.5) * Math.min(1, (DUR - END - 0.2 - x) * 1.2) * 0.03));
   for (let i = 0; i < N; i++) { L[i] += M[i]; R[i] += M[i]; }
   writeWav('audio/music.wav', [L, R]);
 }
@@ -104,8 +105,8 @@ function writeWav(path, chans) {
 
 // ---------- 5. mix: music ducked under voice, loudness -14 LUFS ----------
 ff(['-i', 'audio/vo.wav', '-i', 'audio/music.wav', '-i', 'audio/sfx.wav', '-filter_complex',
-  '[0:a]asplit=2[vo][sc];[1:a]volume=0.55[mu];[mu][sc]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=250[duck];' +
-  '[vo]volume=1.0,aformat=channel_layouts=stereo[v];[2:a]volume=0.8,aformat=channel_layouts=stereo[s];' +
+  '[0:a]asplit=2[vo][sc];[1:a]volume=0.30[mu];[mu][sc]sidechaincompress=threshold=0.02:ratio=10:attack=10:release=300[duck];' +
+  '[vo]volume=1.25,aformat=channel_layouts=stereo[v];[2:a]volume=0.65,aformat=channel_layouts=stereo[s];' +
   '[v][duck][s]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]',
   '-map', '[a]', '-ar', SR, 'out/mix.wav']);
 console.log('audio done: audio/vo.wav audio/music.wav audio/sfx.wav out/mix.wav env.js');
