@@ -1,0 +1,593 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kara Duo — Reel 01</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>html,body{margin:0;background:#2a1f30;height:100%}canvas{display:block;height:100vh;margin:auto}</style>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="env.js"></script>
+<script>
+// Kara Duo · Reel 01 "لعبة البحث عن الباليت" — every frame is a pure function of t (window.seek)
+const W = 1080, H = 1920, DUR = 30;
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+
+// ---------------- brand palette ----------------
+const C = {
+  ivory: '#FAF7F8', lav: '#D0B9D9', lavL: '#E7DAEC', lavLL: '#F3ECF6', lavD: '#A98BB5',
+  mauve: '#654A70', mauveD: '#4F3859', mauveDD: '#3E2B47', ink: '#2B1C33',
+  pink: '#DD4E94', pinkL: '#E98ABC', pinkLL: '#F3C3DC', pinkD: '#C93E82',
+};
+
+// ---------------- math ----------------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const easeIn = (x) => Math.pow(clamp(x), 3);
+const easeInOut = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+function spring(t, k = 170, d = 26) {
+  if (t <= 0) return 0;
+  const w0 = Math.sqrt(k), z = d / (2 * w0);
+  if (z < 1) { const wd = w0 * Math.sqrt(1 - z * z);
+    return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t)); }
+  return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+}
+const SNAPPY = [320, 24], DEFAULT = [170, 22], HEAVY = [110, 18], PLAYFUL = [240, 13];
+const sp = (t, preset = DEFAULT) => spring(t, preset[0], preset[1]);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hex2rgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function mix(a, b, k) { const A = hex2rgb(a), B = hex2rgb(b); k = clamp(k);
+  return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], k))).join(',')})`; }
+const AR = (n) => String(n).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
+const vis = (t, a, b) => t >= a && t < b;
+
+// ---------------- assets ----------------
+const IMG = {};
+const PALETTES = ['07707f44', '4093547d', '7314f8ff', 'a5768f9c', 'a938f01b', 'b6722ef8', 'd754fed1', '85389240',
+  'ec3f8d8c', 'ed15fa8d', '35da7493', '66da4d2b', '79580c51', 'd9d8e2f7', '1762cccf', '7096dce4', '24de4dfd'];
+const HERO = '81c5cd68';
+function loadImg(key, src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => { IMG[key] = i; res(); }; i.onerror = rej; i.src = src; }); }
+
+// recolour the transparent logo to a solid colour (approved white-on-mauve version)
+function tint(img, color) {
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in';
+  x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); return c;
+}
+
+// ---------------- pixel sprites ----------------
+// fn(x, y) -> colour or null on a small grid; auto 1px dark outline; cached; drawn with nearest-neighbour
+const SPR = new Map();
+function sprite(key, w, h, fn, outline = C.ink) {
+  if (SPR.has(key)) return SPR.get(key);
+  const grid = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) grid[y * w + x] = fn(x, y);
+  const c = document.createElement('canvas'); c.width = w + 2; c.height = h + 2;
+  const x2 = c.getContext('2d');
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? null : grid[y * w + x];
+  if (outline) for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++)
+    if (!at(x, y) && (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1))) { x2.fillStyle = outline; x2.fillRect(x + 1, y + 1, 1, 1); }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const col = at(x, y); if (col) { x2.fillStyle = col; x2.fillRect(x + 1, y + 1, 1, 1); } }
+  SPR.set(key, c); return c;
+}
+// draw sprite anchored at (ax, ay) relative point (0..1) with pixel size s
+function drawSpr(c, x, y, s, ax = 0.5, ay = 0.5, flip = false) {
+  g.save(); g.imageSmoothingEnabled = false; g.translate(Math.round(x), Math.round(y));
+  if (flip) g.scale(-1, 1);
+  g.drawImage(c, -c.width * s * ax, -c.height * s * ay, c.width * s, c.height * s); g.restore();
+}
+const inEll = (x, y, cx, cy, rx, ry) => ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1;
+
+// --- the host girl (placeholder until the brand character arrives) ---
+function girl(eyes = 'open', mouth = 'closed') {
+  return sprite(`girl:${eyes}:${mouth}`, 40, 46, (x, y) => {
+    const cx = 19.5;
+    const face = inEll(x, y, cx, 22.5, 9.6, 11) && y >= 12;
+    const hij = inEll(x, y, cx, 20, 15.2, 19.5);
+    const body = y >= 36 && Math.abs(x + 0.5 - cx) <= 12 + (y - 36) * 0.9;
+    // eyes
+    const eyeL = 15, eyeR = 23, ey = 21;
+    const dx = eyes === 'side' ? -1 : eyes === 'sideR' ? 1 : 0;
+    if (face) {
+      if (eyes === 'blink') { if (y === ey + 2 && (x >= eyeL - 1 + dx && x <= eyeL + 1 + dx || x >= eyeR - 1 + dx && x <= eyeR + 1 + dx)) return C.ink; }
+      else if (eyes === 'happy') {
+        for (const ex of [eyeL, eyeR]) { if ((y === ey + 1 && (x === ex - 1 || x === ex + 2)) || (y === ey && (x === ex || x === ex + 1))) return C.ink; }
+      } else {
+        for (const ex of [eyeL + dx, eyeR + dx]) {
+          if (x >= ex && x <= ex + 1 && y >= ey && y <= ey + 2) return (y === ey && x === ex + 1) ? '#FFFFFF' : '#3A2540';
+          if (y === ey && x === ex - 1 && ex < cx) return C.ink;        // lash flick
+          if (y === ey && x === ex + 2 && ex > cx) return C.ink;
+        }
+      }
+      if (y === 18 && ((x >= 14 && x <= 17) || (x >= 22 && x <= 25))) return '#7A5560';               // brows
+      if (y === 25 && (x === 13 || x === 14 || x === 25 || x === 26)) return C.pinkL;                   // cheeks
+      if (y === 25 && (x === 19 || x === 20)) return '#E3AE90';                                         // nose
+      // mouth
+      if (mouth === 'closed' && y === 28 && x >= 18 && x <= 21) return C.pinkD;
+      if (mouth === 'smile' && ((y === 28 && x >= 18 && x <= 21) || (y === 27 && (x === 17 || x === 22)))) return C.pinkD;
+      if (mouth === 'open') { if (y === 27 && x >= 18 && x <= 21) return C.pinkD; if (y === 28 && x >= 18 && x <= 21) return '#7A2448'; if (y === 29 && x >= 19 && x <= 20) return C.pinkD; }
+      if (mouth === 'o') { if ((y === 27 || y === 30) && x >= 19 && x <= 20) return C.pinkD; if ((y === 28 || y === 29) && (x === 18 || x === 21)) return C.pinkD; if ((y === 28 || y === 29) && x >= 19 && x <= 20) return '#7A2448'; }
+      if (y <= 13) return C.lavLL;                                                                       // hijab band
+      const edge = !inEll(x, y, cx, 22.5, 8.6, 10);
+      return edge ? '#EDBF9F' : '#F6D4BA';
+    }
+    if (y >= 12 && y <= 14 && x === 29) return C.pink;                                                  // hijab pin
+    if (y === 13 && (x === 28 || x === 30)) return C.pink;
+    if (hij) {
+      const nearFace = inEll(x, y, cx, 22.5, 11, 12.4);
+      if (nearFace) return '#B593C2';
+      return (x + y) % 9 === 0 && y > 4 ? '#C7A6D3' : '#CDAFD9';
+    }
+    if (body) return (x === 19 || x === 20) && y > 38 ? C.mauveD : '#4A3354';
+    return null;
+  });
+}
+// --- خزّوم: the Khuzama-flower mascot ---
+function mascot(eyes = 'open') {
+  return sprite(`m:${eyes}`, 30, 30, (x, y) => {
+    const cx = 14.5, cy = 14.5, px = x + 0.5 - cx, py = y + 0.5 - cy;
+    if (px * px + py * py <= 5.4 * 5.4) {                                    // face
+      if (eyes === 'blink') { if (y === 15 && (x === 12 || x === 17)) return C.ink; }
+      else if (eyes === 'wink') { if (y >= 13 && y <= 14 && x === 12) return C.ink; if (y === 14 && x >= 16 && x <= 18) return C.ink; }
+      else if (y >= 13 && y <= 14 && (x === 12 || x === 17)) return C.ink;
+      if (y === 17 && x >= 13 && x <= 16) return C.pinkD;
+      if (y === 16 && (x === 10 || x === 19)) return C.pinkL;
+      return C.ivory;
+    }
+    for (let k = 0; k < 4; k++) {                                            // four petals on the diagonals
+      const a = Math.PI / 4 + k * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+      const u = px * ca + py * sa - 8.2, v = -px * sa + py * ca;
+      if ((u / 6.6) ** 2 + (v / 4.4) ** 2 <= 1) {
+        const pinkPetal = k % 2 === 1;
+        if (Math.abs(v) < 0.6 && u > -3 && u < 4) return pinkPetal ? C.pinkLL : C.lavLL;   // vein
+        return pinkPetal ? C.pinkL : C.lav;
+      }
+    }
+    return null;
+  });
+}
+// --- small icons ---
+const sparkle = (col = C.pink, core = C.ivory) => sprite(`sp:${col}`, 9, 9, (x, y) => {
+  const dx = Math.abs(x - 4), dy = Math.abs(y - 4);
+  if (dx === 0 && dy === 0) return core;
+  if ((dx === 0 && dy <= 4) || (dy === 0 && dx <= 4) || (dx <= 1 && dy <= 1)) return col; return null; }, null);
+function star5(filled) {
+  return sprite(`st:${filled}`, 13, 13, (x, y) => {
+    const pts = []; for (let i = 0; i < 10; i++) { const r = i % 2 ? 2.8 : 6.4, a = -Math.PI / 2 + i * Math.PI / 5; pts.push([6.5 + r * Math.cos(a), 6.9 + r * Math.sin(a)]); }
+    let inside = false; const px = x + 0.5, py = y + 0.5;
+    for (let i = 0, j = 9; i < 10; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j];
+      if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside; }
+    if (!inside) return null; return filled ? (y < 5 ? C.pinkL : C.pink) : C.mauveD; });
+}
+const QBLOCK = ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '...##...', '........', '...##...'];
+const qblock = () => sprite('qb', 16, 16, (x, y) => {
+  if (x === 0 || y === 0 || x === 15 || y === 15) return C.mauveDD;
+  if ((x === 2 || x === 13) && (y === 2 || y === 13)) return C.lavD;
+  const qx = x - 4, qy = y - 4; if (qx >= 0 && qx < 8 && qy >= 0 && qy < 8 && QBLOCK[qy][qx] === '#') return C.ivory;
+  return y < 3 ? C.pinkL : C.pink; });
+const sun = () => sprite('sun', 15, 15, (x, y) => { const dx = x - 7, dy = y - 7, r = Math.hypot(dx, dy);
+  if (r <= 3.6) return '#F6C9A0'; if (r > 4.6 && r < 7.2 && (dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy))) return C.pinkL; return null; });
+const moon = () => sprite('moon', 13, 13, (x, y) => (Math.hypot(x - 6, y - 6) <= 5.6 && Math.hypot(x - 8.6, y - 4.4) > 4.4) ? C.ivory : null);
+const HAND = ['....##......', '...#oo#.....', '...#oo#.....', '...#oo####..', '...#oo#oo#oo', '##.#oooooooo', '#o##oooooooo', '#oo#ooooooo#', '.#ooooooooo#', '..#oooooooo#', '...#oooooo#.', '....######..'];
+const hand = () => sprite('hand', 12, 12, (x, y) => { const ch = HAND[y][x]; return ch === '#' ? C.ink : ch === 'o' ? C.ivory : null; }, null);
+const mag = () => sprite('mag', 11, 11, (x, y) => { const r = Math.hypot(x - 4, y - 4);
+  if (r >= 2.6 && r <= 4.2) return C.mauve; if (x - y === 0 && x >= 7 && x <= 10) return C.mauve; if (x - y === 1 && x >= 8 && x <= 10) return C.mauve; return null; }, null);
+const flowerTile = () => sprite('fl', 16, 16, (x, y) => {
+  const px = x + 0.5 - 8, py = y + 0.5 - 8; if (Math.abs(px) < 1.2 && Math.abs(py) < 1.2) return C.pink;
+  for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, u = px * Math.cos(a) + py * Math.sin(a) - 4.2, v = -px * Math.sin(a) + py * Math.cos(a);
+    if ((u / 3.6) ** 2 + (v / 2.3) ** 2 <= 1) return k % 2 ? '#C77BA8' : '#9E7FB0'; } return null; }, null);
+
+// ---------------- pixel text (thresholded, upscaled) ----------------
+const TXT = new Map();
+function ptext(str, { size = 22, weight = 900, family = 'Cairo', color = C.ivory, shadow = null, shadowOff = 1, outline = null } = {}) {
+  const key = [str, size, weight, family, color, shadow, outline].join('|');
+  if (TXT.has(key)) return TXT.get(key);
+  const font = `${weight} ${size}px "${family}"`;
+  const m = document.createElement('canvas').getContext('2d'); m.font = font;
+  const w = Math.ceil(m.measureText(str).width) + 6, h = Math.ceil(size * 1.9);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'); x.font = font; x.textBaseline = 'middle'; x.textAlign = 'center'; x.direction = /[\u0600-\u065F\u066E-\u06FF]/.test(str) ? 'rtl' : 'ltr';
+  x.fillStyle = '#000'; x.fillText(str, w / 2, h / 2);
+  const id = x.getImageData(0, 0, w, h), d = id.data, mask = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) mask[i] = d[i * 4 + 3] > 110 ? 1 : 0;
+  const out = x.createImageData(w, h), o = out.data;
+  const put = (i, col) => { const [r, gg, b] = hex2rgb(col); o[i * 4] = r; o[i * 4 + 1] = gg; o[i * 4 + 2] = b; o[i * 4 + 3] = 255; };
+  if (outline) for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const i = yy * w + xx; if (mask[i]) continue;
+    if ((xx > 0 && mask[i - 1]) || (xx < w - 1 && mask[i + 1]) || (yy > 0 && mask[i - w]) || (yy < h - 1 && mask[i + w])) put(i, outline); }
+  if (shadow) for (let i = 0; i < w * h; i++) { const j = i - shadowOff * w - shadowOff; if (j >= 0 && mask[j] && !mask[i]) put(i, shadow); }
+  for (let i = 0; i < w * h; i++) if (mask[i]) put(i, color);
+  x.putImageData(out, 0, 0); TXT.set(key, c); return c;
+}
+function drawT(c, x, y, s, { ax = 0.5, ay = 0.5, rot = 0, sc = 1, alpha = 1 } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.imageSmoothingEnabled = false; g.translate(x, y); g.rotate(rot); g.scale(sc, sc);
+  g.drawImage(c, -c.width * s * ax, -c.height * s * ay, c.width * s, c.height * s); g.restore();
+}
+// one line built word by word (RTL): words = [[text, time], ...]
+function wordLine(t, words, cx, y, s, style, { pop = SNAPPY, gap = 0.28 } = {}) {
+  const cs = words.map(([w]) => ptext(w, style)), sp0 = style.size * gap;
+  const ws = cs.map((c) => c.width), total = ws.reduce((a, b) => a + b, 0) + sp0 * (cs.length - 1);
+  let xr = cx + total * s / 2;                                   // start from the right edge
+  cs.forEach((c, i) => {
+    const k = sp(t - words[i][1], pop);
+    if (k > 0.001) drawT(c, xr - ws[i] * s / 2, y + (1 - k) * 40, s, { sc: 0.6 + 0.4 * k, alpha: clamp(k * 3) });
+    xr -= (ws[i] + sp0) * s;
+  });
+}
+// clean (non-pixel) text
+function text(str, x, y, { size = 60, weight = 800, family = 'Cairo', color = C.ivory, align = 'center', spacing = 0, alpha = 1 } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.font = `${weight} ${size}px "${family}"`; g.fillStyle = color; g.textAlign = align; g.textBaseline = 'middle';
+  if (spacing) g.letterSpacing = spacing + 'px'; if (/[؀-ۿ]/.test(str)) g.direction = 'rtl'; g.fillText(str, x, y); g.restore();
+}
+
+// ---------------- pixel UI blocks ----------------
+// stepped-corner panel with hard drop shadow
+function panel(x, y, w, h, fill, { border = C.ink, bw = 6, step = 12, shadow = 'rgba(30,18,38,.45)', so = 12 } = {}) {
+  const path = (ox, oy, ww, hh, st) => { g.beginPath(); g.moveTo(ox + st, oy); g.lineTo(ox + ww - st, oy); g.lineTo(ox + ww - st, oy + st / 2); g.lineTo(ox + ww - st / 2, oy + st / 2);
+    g.lineTo(ox + ww - st / 2, oy + st); g.lineTo(ox + ww, oy + st); g.lineTo(ox + ww, oy + hh - st); g.lineTo(ox + ww - st / 2, oy + hh - st); g.lineTo(ox + ww - st / 2, oy + hh - st / 2);
+    g.lineTo(ox + ww - st, oy + hh - st / 2); g.lineTo(ox + ww - st, oy + hh); g.lineTo(ox + st, oy + hh); g.lineTo(ox + st, oy + hh - st / 2); g.lineTo(ox + st / 2, oy + hh - st / 2);
+    g.lineTo(ox + st / 2, oy + hh - st); g.lineTo(ox, oy + hh - st); g.lineTo(ox, oy + st); g.lineTo(ox + st / 2, oy + st); g.lineTo(ox + st / 2, oy + st / 2); g.lineTo(ox + st, oy + st / 2); g.closePath(); };
+  if (shadow) { g.fillStyle = shadow; path(x + so, y + so, w, h, step); g.fill(); }
+  if (border) { g.fillStyle = border; path(x, y, w, h, step); g.fill(); }
+  g.fillStyle = fill; path(x + bw, y + bw, w - 2 * bw, h - 2 * bw, Math.max(0, step - bw)); g.fill();
+}
+// speech bubble with tail pointing to (tx, ty)
+function bubble(cx, cy, w, h, tx, ty, fill = C.ivory) {
+  g.save(); g.fillStyle = C.ink; g.beginPath();
+  const bx = clamp(tx, cx - w / 2 + 40, cx + w / 2 - 80), by = cy + h / 2 - 4;
+  g.moveTo(bx, by); g.lineTo(bx + 46, by); g.lineTo(tx, ty); g.closePath(); g.fill();
+  g.fillStyle = fill; g.beginPath(); g.moveTo(bx + 8, by - 6); g.lineTo(bx + 38, by - 6); g.lineTo(tx + (bx + 23 - tx) * 0.22, ty - (ty - by) * 0.22); g.closePath(); g.fill();
+  g.restore(); panel(cx - w / 2, cy - h / 2, w, h, fill, { so: 10 });
+}
+function pill(cx, cy, w, h, fill, border = C.ink) { panel(cx - w / 2, cy - h / 2, w, h, fill, { border, bw: 6, step: Math.min(h / 2, 24), so: 8 }); }
+
+// ---------------- backgrounds & transitions ----------------
+function bg(base, dot, drift = 0) {
+  g.fillStyle = base; g.fillRect(0, 0, W, H);
+  g.fillStyle = dot; const s = 48, off = drift % s;
+  for (let y = -s; y < H + s; y += s) for (let x = 0; x < W + s; x += s) g.fillRect(x - off + 22, y + off * 0.5 + 22, 6, 6);
+}
+function gridBg(base, line) {
+  g.fillStyle = base; g.fillRect(0, 0, W, H); g.fillStyle = line;
+  for (let x = 0; x <= W; x += 60) g.fillRect(x, 0, 2, H); for (let y = 0; y <= H; y += 60) g.fillRect(0, y, W, 2);
+}
+// pixel block wipe centred on time tc (covers fully at tc)
+function blockWipe(t, tc, color, dur = 0.34) {
+  const k = 1 - Math.abs((t - tc) / (dur / 2)); if (k <= 0) return;
+  const r = rng(99), B = 90;
+  g.fillStyle = color;
+  for (let y = 0; y < H; y += B) for (let x = 0; x < W; x += B) {
+    const thr = (r() * 0.6 + (Math.abs(x - W / 2) / W + Math.abs(y - H / 2) / H) * 0.4);
+    if (k > thr * 0.95) g.fillRect(x, y, B, B);
+  }
+}
+
+// ---------------- camera shake (pure function of t) ----------------
+const HITS = [[6.65, 14], [12.35, 22], [13.75, 26], [18.8, 18], [25.45, 10]];
+for (let i = 0; i < 16; i++) HITS.push([5.0 + i * 0.11, 5]);
+function shake(t) { let x = 0, y = 0;
+  for (const [th, a] of HITS) { const d = t - th; if (d < 0 || d > 0.5) continue; const e = a * Math.exp(-d * 12);
+    x += e * Math.sin(d * 90 + th); y += e * Math.cos(d * 77 + th * 3); } return [x, y]; }
+
+// ---------------- talking & blinking ----------------
+function vo(t) { const e = window.VO_ENV || []; return e[Math.min(e.length - 1, Math.max(0, Math.floor(t * 60)))] || 0; }
+function girlFace(t, eyesDefault, mouthDefault) {
+  const v = vo(t), open = v > 0.16;
+  const mouth = open ? (Math.floor(t * 14) % 3 === 0 ? 'o' : 'open') : mouthDefault;
+  const blink = (t % 3.1) < 0.09 || (t > 12.9 && t < 12.98);
+  return girl(blink ? 'blink' : eyesDefault, mouth);
+}
+
+// ================= SCENES =================
+// host girl position: big in the hook, then bottom-left host for the rest
+function drawHost(t) {
+  const k = sp(t - 1.8, DEFAULT);
+  const x = lerp(540, 182, k), yb = lerp(1990, 1950, k), s = lerp(16, 6.4, k);
+  let eyes = 'open', mouth = 'closed';
+  if (t < 1.8) eyes = Math.floor(t * 2.2) % 2 ? 'side' : 'sideR';
+  else if (t < 7.5) eyes = t > 4.5 ? 'open' : 'side';
+  else if (t < 9.2) { eyes = 'happy'; mouth = 'smile'; }
+  else if (t < 12) eyes = 'sideR';
+  else if (t < 14.5) mouth = 'smile';
+  else { mouth = 'smile'; if (t > 18.1 && t < 19.4) eyes = 'happy'; }
+  if (t > 25.2) { mouth = 'smile'; eyes = t > 28.8 && t < 29.6 ? 'happy' : 'open'; }
+  const bob = Math.sin(t * 4.2) * (t < 1.8 ? 6 : 3);
+  const pop = t < 1.8 ? 0.94 + 0.06 * sp(t, PLAYFUL) : 1;
+  const spr = girlFace(t, eyes, mouth);
+  drawSpr(spr, x, yb + bob, s * pop, 0.5, 1);
+}
+
+// -------- S1 hook 0–1.8 --------
+function sHook(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  // logo in the first 2 seconds
+  const lk = sp(t - 0.08, SNAPPY);
+  if (lk > 0) { const L = IMG.logoW, w = 520 * (0.7 + 0.3 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 2); g.drawImage(L, W / 2 - w / 2, 330 - h / 2, w, h); g.restore(); }
+  wordLine(t, [['وش', 0.35], ['أحط', 0.55], ['الليلة؟', 0.85]], W / 2, 640, 4.4, { size: 26, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  // question bubbles pop around her head
+  [[0.45, 300, 1150, -0.12], [0.8, 800, 1090, 0.1], [1.15, 860, 1330, 0.16]].forEach(([tq, x, y, r], i) => {
+    const k = sp(t - tq, PLAYFUL); if (k <= 0) return;
+    g.save(); g.translate(x, y + Math.sin(t * 5 + i) * 8); g.rotate(r); g.scale(k, k);
+    panel(-70, -70, 140, 140, i === 1 ? C.pinkL : C.lav, { so: 8 }); drawT(ptext('؟', { size: 26, color: C.ivory, shadow: C.ink }), 0, -4, 4);
+    g.restore();
+  });
+}
+
+// -------- S2 invite + palette rain 1.8–7.5 --------
+const RAIN = (() => { const r = rng(42); return PALETTES.slice(0, 16).map((id, i) => ({
+  id, t0: 4.62 + i * 0.11, x: 230 + r() * 620, y: 1500 - i * 18 - r() * 50, w: 330 + r() * 90, r0: (r() - 0.5) * 1.6, r1: (r() - 0.5) * 0.7, xs: (r() - 0.5) * 300 })); })();
+function drawPalette(id, x, y, w, rot, alpha = 1) {
+  const im = IMG[id]; if (!im) return; const h = w * im.height / im.width;
+  g.save(); g.globalAlpha *= alpha; g.translate(x, y); g.rotate(rot);
+  g.fillStyle = 'rgba(30,18,38,.35)'; g.fillRect(-w / 2 + 14, -h / 2 + 18, w, h);
+  g.drawImage(im, -w / 2, -h / 2, w, h); g.restore();
+}
+function sInvite(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  // invite card
+  const ck = sp(t - 1.95, PLAYFUL);
+  if (ck > 0) {
+    g.save(); g.translate(540, 820); g.rotate(-0.06 + (1 - ck) * 0.3); g.scale(ck, ck);
+    panel(-330, -230, 660, 460, C.ivory);
+    g.fillStyle = C.pink; g.fillRect(-324, -224, 648, 110);
+    g.fillStyle = C.mauveDD; for (const rx of [-200, 200]) g.fillRect(rx - 14, -262, 28, 70);
+    drawT(ptext('الليلة', { size: 20, color: C.ivory, shadow: C.pinkD }), 0, -170, 4);
+    drawT(ptext('عزيمة', { size: 30, color: C.mauve, shadow: C.lav, shadowOff: 2 }), 0, 30, 5);
+    const s1 = sp(t - 3.5, PLAYFUL), s2 = sp(t - 3.7, PLAYFUL);
+    if (s1 > 0) drawSpr(sparkle(), 250, -40, 8 * s1); if (s2 > 0) drawSpr(sparkle(C.lavD), -250, 130, 6 * s2);
+    g.restore();
+  }
+  // headline swaps on the voice
+  const st = { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 };
+  if (t < 2.7) wordLine(t, [['عندي', 1.8], ['عزيمة…', 2.05]], W / 2, 420, 5, st);
+  else if (t < 4.5) wordLine(t, [['وأبي', 2.75], ['لوك', 3.1], ['يجنن!', 3.5]], W / 2, 420, 5, st);
+  else {
+    const sh = t > 5.85 ? Math.sin(t * 60) * 6 * Math.exp(-(t - 5.85) * 4) : 0;
+    wordLine(t, [['بس', 4.57], ['الباليتات', 4.8]], W / 2 + sh, 380, 5, st);
+    wordLine(t, [['مره', 5.45], ['كثيرة!', 5.85]], W / 2 + sh, 520, 6, { size: 22, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
+  }
+  // rain
+  for (const p of RAIN) {
+    const k = sp(t - p.t0, [150, 14]); if (k <= 0) continue;
+    const y = lerp(-420, p.y, k), x = p.x + p.xs * (1 - k), rot = lerp(p.r0, p.r1, clamp(k));
+    drawPalette(p.id, x, y, p.w, rot);
+  }
+}
+
+// -------- S3 mascot bursts out 7.5–9.2 --------
+function sMascot(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  const d = t - 7.52;
+  // palettes blown away
+  for (const p of RAIN) {
+    const a = Math.atan2(p.y - 1150, p.x - 540), e = easeIn(d / 0.55) * 1500 + Math.max(0, d) * 300;
+    if (d < 0.6) drawPalette(p.id, p.x + Math.cos(a) * e, p.y + Math.sin(a) * e, p.w, p.r1 + d * 6 * (p.r0 > 0 ? 1 : -1), clamp(1 - d * 1.2));
+  }
+  // brand sparkles fly out
+  const r = rng(5);
+  for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + r(), dist = easeOut(d / 0.7) * (380 + r() * 260);
+    if (d > 0 && d < 0.9) drawSpr(sparkle(i % 2 ? C.pink : C.lavL), 540 + Math.cos(a) * dist, 1080 + Math.sin(a) * dist, 7 * (1 - d / 0.9)); }
+  // mascot
+  const mk = sp(t - 7.58, PLAYFUL);
+  if (mk > 0) { const eyes = (t % 1.7) < 0.1 ? 'blink' : 'open';
+    drawSpr(mascot(eyes), 540, 1110 + Math.sin(t * 5) * 14, 14 * mk); }
+  const nk = sp(t - 8.3, SNAPPY);
+  if (nk > 0) { g.save(); g.translate(540, 1390); g.scale(nk, nk); pill(0, 0, 260, 96, C.pink); drawT(ptext('خزّوم', { size: 18, color: C.ivory, shadow: C.pinkD }), 0, -2, 4); g.restore(); }
+  const bk = sp(t - 7.85, PLAYFUL);
+  if (bk > 0) { g.save(); g.translate(540, 640); g.scale(bk, bk); g.translate(-540, -640);
+    bubble(540, 620, 740, 300, 560, 860);
+    wordLine(t, [['لا', 7.9], ['تحاتين!', 8.05]], 540, 560, 5, { size: 20, color: C.pink, shadow: C.pinkLL, shadowOff: 1 });
+    wordLine(t, [['أنا', 8.25], ['معك', 8.4]], 540, 680, 5, { size: 20, color: C.mauve, shadow: C.lavL, shadowOff: 1 });
+    g.restore(); }
+}
+
+// -------- S4 search 9.2–12.0 --------
+const GRID = ['a938f01b', '85389240', 'ed15fa8d', '7096dce4', '35da7493', 'd9d8e2f7', 'ec3f8d8c', '79580c51', '66da4d2b'];
+function sSearch(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  const jit = t > 11.25 ? Math.sin(t * 70) * 5 : 0;
+  // headline
+  wordLine(t, [['وش', 10.02], ['أختار؟!', 10.25]], W / 2 + 40, 390, 5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
+  // mascot peeks over the window
+  const pk = sp(t - 9.55, SNAPPY);
+  drawSpr(mascot(t > 11.0 ? 'blink' : 'open'), 160, 600 - 70 * pk, 5.5, 0.5, 1);
+  // window
+  const wk = sp(t - 9.22, SNAPPY);
+  g.save(); g.translate(540, 1080); g.scale(0.85 + 0.15 * wk, 0.85 + 0.15 * wk); g.translate(-540, -1080); g.globalAlpha = clamp(wk * 3);
+  panel(80, 560, 920, 900, C.ivory);
+  g.fillStyle = C.mauveD; g.fillRect(86, 566, 908, 70);
+  [C.pink, C.lav, C.ivory].forEach((c, i) => { g.fillStyle = c; g.fillRect(118 + i * 40, 590, 22, 22); });
+  drawT(ptext('KARADUO.COM', { size: 8, weight: 400, family: 'Press Start 2P', color: C.lavL }), 860, 602, 3);
+  // search bar
+  panel(120, 670, 840, 110, C.lavLL, { border: C.lavD, so: 0, bw: 5 });
+  drawSpr(mag(), 190, 725, 5);
+  const q = 'ظلال سهرة', n = Math.floor(clamp((t - 9.42) / 0.55) * q.length);
+  if (n > 0) drawT(ptext(q.slice(0, n), { size: 18, weight: 800, color: C.mauve }), 920, 722, 4, { ax: 1 });
+  if (t > 9.3 && Math.floor(t * 4) % 2 === 0 && n < q.length) { g.fillStyle = C.pink; g.fillRect(n ? 920 - ptext(q.slice(0, n), { size: 18, weight: 800, color: C.mauve }).width * 4 - 14 : 912, 690, 8, 66); }
+  // results grid
+  GRID.forEach((id, i) => {
+    const k = sp(t - (10.05 + i * 0.07), PLAYFUL); if (k <= 0) return;
+    const col = 2 - (i % 3), row = Math.floor(i / 3), cx = 230 + col * 310, cy = 920 + row * 230;
+    g.save(); g.translate(cx + (i % 2 ? jit : -jit), cy); g.scale(k, k);
+    panel(-140, -100, 280, 200, '#FFFFFF', { border: C.lav, bw: 5, so: 6, shadow: 'rgba(101,74,112,.25)' });
+    const im = IMG[id], iw = 230, ih = Math.min(150, iw * im.height / im.width), iw2 = ih * im.width / im.height;
+    g.drawImage(im, -iw2 / 2, -ih / 2, iw2, ih); g.restore();
+  });
+  g.restore();
+  // counter chip
+  const ck = sp(t - 10.1, SNAPPY);
+  if (ck > 0) { const n2 = Math.round(easeOut((t - 10.1) / 0.8) * 60);
+    g.save(); g.translate(800, 512); g.rotate(0.05); g.scale(ck, ck); pill(0, 0, 330, 104, C.pink);
+    drawT(ptext(`+${AR(n2)} باليت`, { size: 18, color: C.ivory, shadow: C.pinkD }), 0, -2, 4); g.restore(); }
+}
+
+// -------- S5 VS 12.0–14.5 --------
+function sVS(t) {
+  // split background with zig-zag seam
+  g.fillStyle = C.pink; g.fillRect(0, 0, W, H);
+  g.fillStyle = C.lav; g.beginPath(); g.moveTo(0, 1010);
+  for (let x = 0; x <= W; x += 60) { g.lineTo(x + 30, 970); g.lineTo(x + 60, 1010); } g.lineTo(W, H); g.lineTo(0, H); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.07)'; for (let y = -12 + (t * 40) % 12; y < H; y += 12) g.fillRect(0, y, W, 4);
+  // health bars
+  const drain = clamp((t - 13.75) / 0.35);
+  [[580, 1, 'ES25'], [100, 1 - drain, '???']].forEach(([x, f, lab]) => {
+    g.fillStyle = C.ink; g.fillRect(x, 290, 400, 54); g.fillStyle = C.mauveDD; g.fillRect(x + 6, 296, 388, 42);
+    g.fillStyle = C.ivory; g.fillRect(x + 6, 296, 388 * f, 42);
+    drawT(ptext(lab, { size: 8, weight: 400, family: 'Press Start 2P', color: C.ivory, shadow: C.ink }), x + 200, 380, 4);
+  });
+  // fighters
+  const ak = sp(t - 12.05, SNAPPY), dash = easeIn((t - 13.5) / 0.25), back = sp(t - 13.85, DEFAULT);
+  let hx = lerp(1500, 720, ak), hy = 690 + Math.sin(t * 4.4) * 14, hw = 470;
+  if (t > 13.5) { hx = lerp(720, 420, dash); hy = lerp(690, 1230, dash); }
+  if (t > 13.85) { hx = lerp(420, 540, back); hy = lerp(1230, 1060, back); hw = lerp(470, 640, back); }
+  const qk = sp(t - 12.15, SNAPPY), hitk = t - 13.75;
+  if (hitk < 0.1) { const qx = lerp(-300, 340, qk) + (hitk > 0 ? Math.sin(hitk * 120) * 16 : 0); drawSpr(qblock(), qx, 1300 + Math.abs(Math.sin(t * Math.PI * 2)) * -22, 17, 0.5, 0.5); }
+  else { const r = rng(3); for (let i = 0; i < 9; i++) { const vx = (r() - 0.5) * 1400, vy = -400 - r() * 900, d = hitk;
+      g.fillStyle = i % 2 ? C.pink : C.mauveDD; const s = 70 - d * 40; if (s > 0) g.fillRect(340 + vx * d - s / 2, 1300 + vy * d + 1800 * d * d - s / 2, s, s); } }
+  drawPalette(HERO, hx, hy, hw, t > 13.85 ? 0 : -0.08);
+  if (t > 13.9) { const kk = sp(t - 13.9, PLAYFUL); drawT(ptext('KO!', { size: 16, weight: 400, family: 'Press Start 2P', color: C.ivory, outline: C.ink }), 540, 1470, 7, { sc: kk, rot: -0.08 }); }
+  // VS slam
+  const vk = sp(t - 12.32, SNAPPY);
+  if (vk > 0 && t < 13.5) drawT(ptext('VS', { size: 32, weight: 400, family: 'Press Start 2P', color: '#FFE9F4', shadow: C.ink, shadowOff: 3 }), 540, 1000, 7, { sc: lerp(2.6, 1, vk) * (1 + 0.05 * Math.max(0, Math.cos(t * Math.PI * 4))), alpha: clamp(vk * 4) });
+  // challenge bubble
+  const bk = sp(t - 12.68, PLAYFUL);
+  if (bk > 0 && t < 13.5) { g.save(); g.translate(560, 1560); g.scale(bk, bk); g.translate(-560, -1560);
+    bubble(600, 1520, 470, 150, 330, 1650); drawT(ptext('مين يفوز؟', { size: 20, color: C.mauve }), 600, 1515, 4); g.restore(); }
+  if (t > 13.95) { const s1 = sp(t - 13.95, PLAYFUL); drawSpr(sparkle(), 860, 820, 9 * s1); drawSpr(sparkle(C.ivory, C.pink), 230, 900, 7 * sp(t - 14.05, PLAYFUL)); }
+}
+
+// -------- S6 rating 14.5–19.5 --------
+function arch(cx, top, w, h, fill, border = C.ink) {
+  const r = w / 2; g.fillStyle = border; g.beginPath(); g.moveTo(cx - r - 6, top + h); g.lineTo(cx - r - 6, top + r); g.arc(cx, top + r, r + 6, Math.PI, 0); g.lineTo(cx + r + 6, top + h); g.fill();
+  g.fillStyle = fill; g.beginPath(); g.moveTo(cx - r, top + h); g.lineTo(cx - r, top + r); g.arc(cx, top + r, r, Math.PI, 0); g.lineTo(cx + r, top + h); g.fill();
+}
+function sRating(t) {
+  bg(C.mauve, C.mauveD, t * 20);
+  const ak = sp(t - 14.52, DEFAULT);
+  g.save(); g.translate(0, (1 - ak) * 900);
+  arch(540, 330, 600, 600, C.lav);
+  drawPalette(HERO, 540, 700 + Math.sin(t * 2.4) * 8, 470 * (0.6 + 0.4 * sp(t - 14.7, PLAYFUL)), 0);
+  g.restore();
+  const nk = sp(t - 14.85, SNAPPY);
+  if (nk > 0) { g.save(); g.translate(540, 985); g.scale(nk, nk); pill(0, 0, 440, 100, C.pink); drawT(ptext('سموكي روز', { size: 20, color: C.ivory, shadow: C.pinkD }), 0, -2, 4); g.restore(); }
+  // counter
+  if (t > 15.85) { const n = Math.round(easeOut((t - 15.9) / 1.35) * 454), pk = sp(t - 15.85, SNAPPY);
+    drawT(ptext(AR(n), { size: 34, color: C.ivory, shadow: C.pink, shadowOff: 3 }), 540, 1150, 6, { sc: 0.7 + 0.3 * pk });
+    const lk = sp(t - 17.38, SNAPPY);
+    if (lk > 0) drawT(ptext('بنت قيّموه', { size: 18, color: C.lavL }), 540, 1300, 4, { sc: lk }); }
+  // stars
+  for (let i = 0; i < 5; i++) {
+    const ti = 18.08 + (4 - i) * 0.12, on = t >= ti, k = sp(t - ti, PLAYFUL);
+    const x = 540 + (i - 2) * 132; drawSpr(star5(on), x, 1430, on ? 8 * (0.7 + 0.3 * k) : 8);
+  }
+  // 5.0 stamp
+  const sk = sp(t - 18.8, SNAPPY);
+  if (sk > 0) { g.save(); g.translate(850, 430); g.rotate(-0.22); g.scale(lerp(2.4, 1, sk), lerp(2.4, 1, sk)); g.globalAlpha = clamp(sk * 5);
+    panel(-130, -78, 260, 156, C.pink, { border: C.ivory, bw: 8, so: 0 });
+    drawT(ptext('٥٫٠', { size: 30, color: C.ivory, shadow: C.pinkD, shadowOff: 2 }), 0, -4, 4); g.restore(); }
+}
+
+// -------- S7 turntable day → night 19.5–25.2 --------
+function sTurn(t) {
+  const night = easeInOut((t - 22.5) / 0.7);
+  gridBg(mix(C.ivory, C.mauveDD, night), mix(C.lavL, C.mauveD, night));
+  // sky icon
+  const ik = sp(t - 19.6, SNAPPY);
+  if (night < 0.5) drawSpr(sun(), 900, 380 + Math.sin(t * 2) * 6, 8 * ik * (1 - night * 2));
+  else drawSpr(moon(), 900, 380, 9 * clamp((night - 0.5) * 2));
+  if (night > 0.3) { const r = rng(11); for (let i = 0; i < 14; i++) { const x = r() * W, y = 300 + r() * 500; if (Math.sin(t * 6 + i) > 0.2) { g.fillStyle = C.lavL; g.fillRect(x, y, 8, 8); } } }
+  // arch + turntable
+  arch(540, 470, 660, 760, mix(C.lav, C.mauve, night));
+  g.fillStyle = C.ink; g.beginPath(); g.ellipse(540, 1250, 350, 78, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = C.mauveDD; g.beginPath(); g.ellipse(540, 1240, 340, 70, 0, 0, Math.PI * 2); g.fill();
+  for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2 + t * 1.3, x = 540 + Math.cos(a) * 300, y = 1240 + Math.sin(a) * 52;
+    if (Math.sin(a) > -0.2) { g.fillStyle = i % 2 ? C.pink : C.pinkLL; g.fillRect(x - 7, y - 7, 14, 14); } }
+  drawT(ptext('360°', { size: 8, weight: 400, family: 'Press Start 2P', color: mix(C.lavD, C.lavL, night) }), 540, 1350, 4);
+  // product: gentle 2.5D sway, full spin on "وتقلبينه"
+  const spin = clamp((t - 22.5) / 0.7), ph = Math.sin(t * 1.6) * 0.5 + spin * Math.PI * 2;
+  const pk = sp(t - 19.55, DEFAULT), w = 610 * pk;
+  g.save(); g.translate(540, 960 + Math.sin(t * 2.2) * 10); g.scale(Math.max(0.06, Math.abs(Math.cos(ph))), 1);
+  if (Math.cos(ph) >= 0) drawPalette(HERO, 0, 0, w * 0.92, 0);
+  else { const im = IMG[HERO], bw = w * 0.92, bh = bw * im.height / im.width; panel(-bw / 2, -bh / 2, bw, bh, '#1E1622', { border: C.ink, so: 14 }); }
+  g.restore();
+  // call-outs
+  const tags = [
+    ['١٥ لون', 19.8, 250, 600, 380, 800, null],
+    ['ناعم الصبح', 21.55, 790, 560, 680, 790, 'sun'],
+    ['سموكي بالليل', 23.18, 320, 1440, 420, 1120, 'moon'],
+    ['ثبات المحترفات', 23.95, 760, 1530, 690, 1150, null],
+  ];
+  for (const [label, ti, x, y, px, py, icon] of tags) {
+    const k = sp(t - ti, PLAYFUL); if (k <= 0) continue;
+    g.strokeStyle = mix(C.mauve, C.lavL, night); g.lineWidth = 6; g.setLineDash([12, 10]); g.beginPath(); g.moveTo(x, y); g.lineTo(lerp(x, px, clamp(k)), lerp(y, py, clamp(k))); g.stroke(); g.setLineDash([]);
+    g.fillStyle = C.pink; g.fillRect(px - 9, py - 9, 18, 18);
+    const tc = ptext(label, { size: 17, color: C.ivory }), tw = tc.width * 3.4 + (icon ? 84 : 56);
+    g.save(); g.translate(x, y); g.scale(k, k); pill(0, 0, tw, 100, ti > 23 ? C.pinkD : C.mauveDD, C.ink);
+    if (icon) { drawSpr(icon === 'sun' ? sun() : moon(), -tw / 2 + 48, -2, 4); drawT(tc, 22, -2, 3.4); } else drawT(tc, 0, -2, 3.4);
+    g.restore();
+  }
+}
+
+// -------- S8 lockup 25.2–30 --------
+function sLock(t) {
+  // khuzama pattern sweeps in from the right (RTL)
+  const wk = easeOut((t - 25.2) / 0.45), off = (1 - wk) * W;
+  g.fillStyle = C.mauve; g.fillRect(off, 0, W, H);
+  const fl = flowerTile(), dr = (t - 25.2) * 18;
+  g.save(); g.beginPath(); g.rect(off, 0, W, H); g.clip();
+  for (let y = -200, row = 0; y < H + 200; y += 170, row++) for (let x = -200; x < W + 200; x += 170) {
+    const xx = x + (row % 2) * 85 + off + (dr % 170), yy = y + (dr * 0.5 % 170);
+    g.globalAlpha = 0.7; drawSpr(fl, xx, yy, 6); g.globalAlpha = 1; g.fillStyle = C.pinkD; g.fillRect(xx + 80, yy + 80, 10, 10);
+  }
+  g.restore();
+  // circle seal
+  const ck = sp(t - 25.38, HEAVY);
+  if (ck > 0) { g.save(); g.translate(540, 950); g.scale(ck, ck);
+    g.fillStyle = C.mauve; g.beginPath(); g.arc(0, 0, 420, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = C.lavD; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 440, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(0, 0, 404, 0, Math.PI * 2); g.stroke();
+    g.restore(); }
+  // logo + slogan
+  const lk = sp(t - 25.6, HEAVY);
+  if (lk > 0) { const L = IMG.logoW, w = 620 * (0.82 + 0.18 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 3); g.drawImage(L, 540 - w / 2, 800 - h / 2, w, h); g.restore(); }
+  [['صُنع', 26.61], ['ليعتني', 27.05], ['بجمالك', 27.6]].reduce((x, [w, ti]) => {
+    g.save(); g.font = '800 70px "Cairo"'; const ww = g.measureText(w).width; g.restore();
+    const k = sp(t - ti, SNAPPY); if (k > 0) text(w, x - ww / 2, 960 + (1 - k) * 30, { size: 70, alpha: clamp(k * 3) });
+    return x - ww - 22; }, 540 + 205);
+  const ek = sp(t - 27.95, DEFAULT);
+  if (ek > 0) text('SAUDI BEAUTY BRAND', 540, 1060, { size: 26, weight: 500, family: 'Montserrat', color: C.lav, spacing: 9, alpha: clamp(ek * 2) });
+  // CTA button + cursor press
+  const bk = sp(t - 28.0, SNAPPY), press = t > 28.9 ? 1 - 0.07 * Math.exp(-(t - 28.9) * 10) * Math.sin(Math.min(Math.PI, (t - 28.9) * 18)) : 1;
+  if (bk > 0) { g.save(); g.translate(540, 1240); g.scale(bk * press, bk * press); pill(0, 0, 600, 130, C.pink);
+    text('اكتشفي سموكي روز', 0, -4, { size: 50, weight: 800 }); g.restore(); }
+  const uk = sp(t - 28.3, DEFAULT);
+  if (uk > 0) text('karaduo.com', 540, 1380, { size: 36, weight: 600, family: 'Montserrat', color: C.lavL, alpha: clamp(uk * 2) });
+  if (t > 28.35) { const mk = easeOut((t - 28.35) / 0.5); drawSpr(hand(), lerp(1000, 700, mk), lerp(1700, 1250, mk), 7, 0.2, 0.05); }
+  if (t > 28.92 && t < 29.4) { const d = t - 28.92; g.strokeStyle = C.ivory; g.lineWidth = 8 * (1 - d / 0.48); g.beginPath(); g.arc(717, 1255, 30 + d * 260, 0, Math.PI * 2); g.stroke(); }
+  // mascot on the seal
+  const mk = sp(t - 25.9, PLAYFUL);
+  if (mk > 0) drawSpr(mascot(t > 29.15 && t < 29.6 ? 'wink' : 'open'), 860, 600 + Math.sin(t * 4) * 8, 6.5 * mk);
+}
+
+const SCENES = [[0, 1.8, sHook], [1.8, 7.5, sInvite], [7.5, 9.2, sMascot], [9.2, 12.0, sSearch], [12.0, 14.5, sVS], [14.5, 19.5, sRating], [19.5, 25.2, sTurn], [25.2, 30.01, sLock]];
+const WIPES = [[9.2, C.lav], [12.0, C.mauveDD], [14.5, C.pink], [19.5, C.lavL]];
+
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = true;
+  const [sx, sy] = shake(t);
+  g.save(); g.translate(sx, sy);
+  for (const [a, b, fn] of SCENES) if (t >= a && t < b) fn(t);
+  drawHost(t);
+  g.restore();
+  for (const [tc, col] of WIPES) blockWipe(t, tc, col);
+}
+
+window.__ready = false;
+window.seek = (t) => { draw(t); return true; };
+(async () => {
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg(HERO, `assets/${HERO}.png`), ...PALETTES.map((id) => loadImg(id, `assets/${id}.png`))]);
+  IMG.logoW = tint(IMG.logo, C.ivory);
+  await Promise.all(['900 20px Cairo', '800 20px Cairo', '700 20px Cairo', '20px "Press Start 2P"', '500 20px Montserrat', '600 20px Montserrat'].map((f) => document.fonts.load(f, 'abcأب٠')));
+  await document.fonts.ready;
+  window.__ready = true; draw(0);
+  if (!navigator.webdriver) { const t0 = performance.now(); (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })(); }
+})();
+</script>
