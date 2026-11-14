@@ -2,3 +2,7 @@ reels/*/out/silent.mp4
 reels/*/out/mix.wav
 reels/*/out/still_*.png
 reels/*/audio/*.wav
+reels/*/out/overlay_*.mov
+reels/*/out/screen_*.mp4
+reels/*/out/mix_*.wav
+reels/*/out/_ov.png
