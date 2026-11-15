@@ -187,6 +187,22 @@ function sSwatch(t) {
 }
 
 // -------- S7 real review 19.6–23.0 --------
+
+// ---------- real written reviews from karaduo.com (text as written, emojis removed, names omitted) ----------
+function wrapLines(str, size, maxW, weight = 700) {
+  g.save(); g.font = `${weight} ${size}px "Cairo"`; const words = str.split(' '), lines = []; let cur = '';
+  for (const w of words) { const nx = cur ? cur + ' ' + w : w; if (g.measureText(nx).width > maxW && cur) { lines.push(cur); cur = w; } else cur = nx; }
+  if (cur) lines.push(cur); g.restore(); return lines;
+}
+function reviewCard(cx, cy, w, quote, k, tilt = 0) {
+  if (k <= 0) return; const lines = wrapLines(quote, 46, w - 90), h = 120 + lines.length * 62;
+  g.save(); g.translate(cx, cy); g.rotate(tilt); g.scale(0.6 + 0.4 * k, 0.6 + 0.4 * k); g.globalAlpha *= clamp(k * 3);
+  panel(-w / 2, -h / 2, w, h, C.ivory, { so: 10 });
+  for (let i = 0; i < 5; i++) drawSpr(star5(true), w / 2 - 50 - i * 46, -h / 2 + 46, 3);
+  text('تقييم من المتجر', -w / 2 + 40, -h / 2 + 46, { size: 26, weight: 700, color: C.lavD, align: 'left' });
+  lines.forEach((ln, i) => text(ln, w / 2 - 40, -h / 2 + 110 + i * 62, { size: 46, weight: 800, color: C.mauve, align: 'right' }));
+  g.restore();
+}
 function sReview(t) {
   space(t, C.mauve);
   const bk = sp(t - 19.75, PLAYFUL);
@@ -198,9 +214,11 @@ function sReview(t) {
     for (let i = 0; i < 5; i++) { const ti = 21.5 + (4 - i) * 0.12, on = t >= ti, k = sp(t - ti, PLAYFUL);
       drawSpr(star5(on), 540 + (i - 2) * 112, 990, on ? 7 * (0.7 + 0.3 * k) : 7); }
     g.restore(); }
-  const sk = sp(t - 22.2, SNAPPY);
-  if (sk > 0) { g.save(); g.translate(800, 1330); g.rotate(-0.12); g.scale(sk, sk); pill(0, 0, 330, 110, C.pink); drawT(ptext('٥٫٠ ★', { size: 20, color: C.ivory }), 0, -2, 4); g.restore(); }
-  photo('box', 300, 1380 + (1 - sp(t - 20, DEFAULT)) * 500, 300);
+  // a second real written review from the product page
+  reviewCard(620, 1330, 760, 'خييال الااضاءة ما استخدمي لعرايسي الا هي لمعان واضح وحلو', sp(t - 21.95, PLAYFUL), 0.02);
+  const sk = sp(t - 22.35, SNAPPY);
+  if (sk > 0) { g.save(); g.translate(840, 1600); g.rotate(-0.12); g.scale(sk, sk); pill(0, 0, 330, 110, C.pink); drawT(ptext('٥٫٠ ★', { size: 20, color: C.ivory }), 0, -2, 4); g.restore(); }
+  photo('box', 850, 400 + (1 - sp(t - 20, DEFAULT)) * -500, 240);
 }
 
 // -------- S8 how to order 23.0–29.6 --------

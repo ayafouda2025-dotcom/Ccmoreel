@@ -471,6 +471,23 @@ function arch(cx, top, w, h, fill, border = C.ink) {
   const r = w / 2; g.fillStyle = border; g.beginPath(); g.moveTo(cx - r - 6, top + h); g.lineTo(cx - r - 6, top + r); g.arc(cx, top + r, r + 6, Math.PI, 0); g.lineTo(cx + r + 6, top + h); g.fill();
   g.fillStyle = fill; g.beginPath(); g.moveTo(cx - r, top + h); g.lineTo(cx - r, top + r); g.arc(cx, top + r, r, Math.PI, 0); g.lineTo(cx + r, top + h); g.fill();
 }
+
+// ---------- real written reviews from karaduo.com (text as written, emojis removed, names omitted) ----------
+function wrapLines(str, size, maxW, weight = 700) {
+  g.save(); g.font = `${weight} ${size}px "Cairo"`; const words = str.split(' '), lines = []; let cur = '';
+  for (const w of words) { const nx = cur ? cur + ' ' + w : w; if (g.measureText(nx).width > maxW && cur) { lines.push(cur); cur = w; } else cur = nx; }
+  if (cur) lines.push(cur); g.restore(); return lines;
+}
+function reviewCard(cx, cy, w, quote, k, tilt = 0) {
+  if (k <= 0) return; const lines = wrapLines(quote, 46, w - 90), h = 120 + lines.length * 62;
+  g.save(); g.translate(cx, cy); g.rotate(tilt); g.scale(0.6 + 0.4 * k, 0.6 + 0.4 * k); g.globalAlpha *= clamp(k * 3);
+  panel(-w / 2, -h / 2, w, h, C.ivory, { so: 10 });
+  for (let i = 0; i < 5; i++) drawSpr(star5(true), w / 2 - 50 - i * 46, -h / 2 + 46, 3);
+  text('تقييم من المتجر', -w / 2 + 40, -h / 2 + 46, { size: 26, weight: 700, color: C.lavD, align: 'left' });
+  lines.forEach((ln, i) => text(ln, w / 2 - 40, -h / 2 + 110 + i * 62, { size: 46, weight: 800, color: C.mauve, align: 'right' }));
+  g.restore();
+}
+const ES25_REVIEWS = [['يجننن خيالي', 15.95], ['الالوانن تجنن والبقمنت خيالي', 17.15], ['الباليت فيه كل الالوان البيرفكتتتتت يجننن انصح فيه', 18.3]];
 function sRating(t) {
   bg(C.mauve, C.mauveD, t * 20);
   const ak = sp(t - 14.52, DEFAULT);
@@ -490,11 +507,14 @@ function sRating(t) {
     const ti = 18.08 + (4 - i) * 0.12, on = t >= ti, k = sp(t - ti, PLAYFUL);
     const x = 540 + (i - 2) * 132; drawSpr(star5(on), x, 1430, on ? 8 * (0.7 + 0.3 * k) : 8);
   }
-  // 5.0 stamp
+  // real written reviews, one after another
+  ES25_REVIEWS.forEach(([q, ti], i) => { const nx = i + 1 < ES25_REVIEWS.length ? ES25_REVIEWS[i + 1][1] : 99;
+    if (t >= ti && t < nx + 0.15) { const out = clamp((nx + 0.15 - t) / 0.15); reviewCard(660, 1660, 700, q, sp(t - ti, PLAYFUL) * out, i % 2 ? 0.025 : -0.025); } });
+  // rating stamp (store average today)
   const sk = sp(t - 18.8, SNAPPY);
   if (sk > 0) { g.save(); g.translate(850, 430); g.rotate(-0.22); g.scale(lerp(2.4, 1, sk), lerp(2.4, 1, sk)); g.globalAlpha = clamp(sk * 5);
     panel(-130, -78, 260, 156, C.pink, { border: C.ivory, bw: 8, so: 0 });
-    drawT(ptext('٥٫٠', { size: 30, color: C.ivory, shadow: C.pinkD, shadowOff: 2 }), 0, -4, 4); g.restore(); }
+    drawT(ptext('٤٫٩٩', { size: 30, color: C.ivory, shadow: C.pinkD, shadowOff: 2 }), 0, -4, 3.4); g.restore(); }
 }
 
 // -------- S7 turntable day → night 19.5–25.2 --------
