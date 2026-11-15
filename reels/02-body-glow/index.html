@@ -500,8 +500,30 @@ function reviewCard(cx, cy, w, quote, k, tilt = 0) {
   lines.forEach((ln, i) => text(ln, w / 2 - 40, -h / 2 + 110 + i * 62, { size: 46, weight: 800, color: C.mauve, align: 'right' }));
   g.restore();
 }
+const BG_REVIEWS = [["يجنن فوق المتوقع", "طقم ٤ درجات"], ["خييال الااضاءة ما استخدمي لعرايسي الا هي لمعان واضح وحلو", "طقم ٤ درجات"], ["منتج رائع بمعنى الكلمه اقدر استخدمه لجسمي وكذلك للميكب ثباته يجنن", "رويال جلو"], ["جودة ممتازة, سعر مناسب, تغليف جيد, مطابق للوصف", "رويال جلو"], ["مره رهيبه الاضاءه وثابته وتنفرد بسهوله على جسم والالوان خيال", "رويال جلو"], ["افضل هاي لايت جربته واضح وفيه حبات قليتر ياخذ العقل", "رويال جلو"], ["خيالي والدرجات تجنن واللممممعه مو عاديه", "رويال جلو"], ["رووعه اللمعه تاخذ العقل", "رويال جلو"], ["حلوين مكس مع بعض لحالهم ولا مع قلتر اكسترا لمعه", "رويال جلو"], ["جربته بكذا طريقة وكل طريقة يعطيني نتيجة أحلى من اللي قبل خياااااال خيال", "رويال جلو"], ["خياالي مره من احلى الهايلايترات اللي جرربتها مره تسووووى خذوها وانتم مغمضين", "رويال جلو"], ["خييييالللللللللل", "رويال جلو"], ["خييييالي وثباته مجنون!", "بينك جلام"], ["شي خورافي وفوق الخيال احبكم", "بينك جلام"], ["رروعه روعه روعه شهاتي مجروحه فيها ينافس إضائات البراند", "بينك جلام"], ["صراحة مرة حلو ودايم اخذه لعرايسي الجميلات ما استغني عنه وفيه كذا طريقة له", "بينك جلام"], ["المعروف لا يعرف يفوووز", "بينك جلام"]];
+
+// ---------- review rain: real written reviews from karaduo.com falling like rain ----------
+function rainCard(cx, cy, w, quote, tag, rot, a) {
+  const lines = wrapLines(quote, 34, w - 60).slice(0, 3), h = 92 + lines.length * 46;
+  g.save(); g.translate(cx, cy); g.rotate(rot); g.globalAlpha *= a;
+  panel(-w / 2, -h / 2, w, h, C.ivory, { so: 8, bw: 5, step: 10 });
+  for (let i = 0; i < 5; i++) drawSpr(star5(true), w / 2 - 36 - i * 34, -h / 2 + 34, 2.2);
+  text(tag, -w / 2 + 26, -h / 2 + 34, { size: 22, weight: 700, color: C.pinkD, align: 'left' });
+  lines.forEach((ln, i) => text(ln, w / 2 - 28, -h / 2 + 84 + i * 46, { size: 34, weight: 800, color: C.mauve, align: 'right' }));
+  g.restore();
+}
+function reviewRain(t, list, t0, t1, seed, every = 0.17, fall = 2.6) {
+  const r = rng(seed); const n = Math.floor((t1 - t0) / every);
+  for (let i = 0; i < n; i++) {
+    const [q, tag] = list[i % list.length], ts = t0 + i * every, d = t - ts, x = 150 + r() * 780, w = 400 + r() * 90, rot0 = (r() - 0.5) * 0.5, sway = r() * 6;
+    if (d < 0 || d > fall) continue;
+    const y = -220 + (H + 440) * (d / fall), rot = rot0 + Math.sin(d * 2 + sway) * 0.08, a = clamp((t1 + 0.3 - t) / 0.3);
+    rainCard(x + Math.sin(d * 1.6 + sway) * 30, y, w, q, tag, rot, a);
+  }
+}
 function sReview(t) {
   space(t, C.mauve);
+  reviewRain(t, BG_REVIEWS, 19.65, 23.1, 33, 0.14);
   const bk = sp(t - 19.75, PLAYFUL);
   if (bk > 0) { g.save(); g.translate(540, 880); g.scale(bk, bk); g.translate(-540, -880);
     bubble(540, 860, 860, 520, 380, 1240);
@@ -512,7 +534,6 @@ function sReview(t) {
       drawSpr(star5(on), 540 + (i - 2) * 112, 990, on ? 7 * (0.7 + 0.3 * k) : 7); }
     g.restore(); }
   // a second real written review from the product page
-  reviewCard(620, 1330, 760, 'خييال الااضاءة ما استخدمي لعرايسي الا هي لمعان واضح وحلو', sp(t - 21.95, PLAYFUL), 0.02);
   const sk = sp(t - 22.35, SNAPPY);
   if (sk > 0) { g.save(); g.translate(840, 1600); g.rotate(-0.12); g.scale(sk, sk); pill(0, 0, 330, 110, C.pink); drawT(ptext('٥٫٠ ★', { size: 20, color: C.ivory }), 0, -2, 4); g.restore(); }
   photo('box', 850, 400 + (1 - sp(t - 20, DEFAULT)) * -500, 240);

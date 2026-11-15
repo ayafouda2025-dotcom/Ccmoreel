@@ -487,9 +487,30 @@ function reviewCard(cx, cy, w, quote, k, tilt = 0) {
   lines.forEach((ln, i) => text(ln, w / 2 - 40, -h / 2 + 110 + i * 62, { size: 46, weight: 800, color: C.mauve, align: 'right' }));
   g.restore();
 }
-const ES25_REVIEWS = [['يجننن خيالي', 15.95], ['الالوانن تجنن والبقمنت خيالي', 17.15], ['الباليت فيه كل الالوان البيرفكتتتتت يجننن انصح فيه', 18.3]];
+const ES25_REVIEWS = [["يجننن خيالي", "تقييم من المتجر"], ["خيالليي والالوان وااضحه واستخدماته متعدده حبيته", "تقييم من المتجر"], ["فوق الخيال الصراحه و طبيعي ويحلى العيون من اجمل الايشادو كا تجربه", "تقييم من المتجر"], ["يججججنننن البقمينت قوي والدرجات حلوه شكرا كارا دو على هذا الإبداع", "تقييم من المتجر"], ["الباليت فيه كل الالوان البيرفكتتتتت يجننن انصح فيه", "تقييم من المتجر"], ["خيالل الباليت متكامل واللوانه عملييه", "تقييم من المتجر"], ["الالوانن تجنن والبقمنت خيالي", "تقييم من المتجر"], ["خياال يجي بلشر وكونتور وشادو يعني 3-1 عجبني نرا وثابت", "تقييم من المتجر"], ["جميل يستاهل التجربه", "تقييم من المتجر"], ["الالوان تهبل ووواضحه يستحق الشراء", "تقييم من المتجر"], ["مرا حلو للي يحبون السموكي بينفعكم", "تقييم من المتجر"], ["مبدعين جدا جوده عاليه للأمام يأكلوا", "تقييم من المتجر"], ["والله بنات يجنننن عن تجربه أنصحكم فيه يجمع كل الألوان المهمه إللي نحتاجها", "تقييم من المتجر"], ["مررررا حلو والأوان واضحه وثابته", "تقييم من المتجر"], ["خيالي الالوان واضحه", "تقييم من المتجر"], ["جميل جدا ومختصر ومريح 4في واحد حقيقي مره مبسوطه شكراً KARA", "تقييم من المتجر"], ["الالون تجنن والثبات بطل عن تجربه", "تقييم من المتجر"]];
+
+// ---------- review rain: real written reviews from karaduo.com falling like rain ----------
+function rainCard(cx, cy, w, quote, tag, rot, a) {
+  const lines = wrapLines(quote, 34, w - 60).slice(0, 3), h = 92 + lines.length * 46;
+  g.save(); g.translate(cx, cy); g.rotate(rot); g.globalAlpha *= a;
+  panel(-w / 2, -h / 2, w, h, C.ivory, { so: 8, bw: 5, step: 10 });
+  for (let i = 0; i < 5; i++) drawSpr(star5(true), w / 2 - 36 - i * 34, -h / 2 + 34, 2.2);
+  text(tag, -w / 2 + 26, -h / 2 + 34, { size: 22, weight: 700, color: C.pinkD, align: 'left' });
+  lines.forEach((ln, i) => text(ln, w / 2 - 28, -h / 2 + 84 + i * 46, { size: 34, weight: 800, color: C.mauve, align: 'right' }));
+  g.restore();
+}
+function reviewRain(t, list, t0, t1, seed, every = 0.17, fall = 2.6) {
+  const r = rng(seed); const n = Math.floor((t1 - t0) / every);
+  for (let i = 0; i < n; i++) {
+    const [q, tag] = list[i % list.length], ts = t0 + i * every, d = t - ts, x = 150 + r() * 780, w = 400 + r() * 90, rot0 = (r() - 0.5) * 0.5, sway = r() * 6;
+    if (d < 0 || d > fall) continue;
+    const y = -220 + (H + 440) * (d / fall), rot = rot0 + Math.sin(d * 2 + sway) * 0.08, a = clamp((t1 + 0.3 - t) / 0.3);
+    rainCard(x + Math.sin(d * 1.6 + sway) * 30, y, w, q, tag, rot, a);
+  }
+}
 function sRating(t) {
   bg(C.mauve, C.mauveD, t * 20);
+  reviewRain(t, ES25_REVIEWS, 15.0, 19.6, 21);
   const ak = sp(t - 14.52, DEFAULT);
   g.save(); g.translate(0, (1 - ak) * 900);
   arch(540, 330, 600, 600, C.lav);
@@ -498,6 +519,7 @@ function sRating(t) {
   const nk = sp(t - 14.85, SNAPPY);
   if (nk > 0) { g.save(); g.translate(540, 985); g.scale(nk, nk); pill(0, 0, 440, 100, C.pink); drawT(ptext('سموكي روز', { size: 20, color: C.ivory, shadow: C.pinkD }), 0, -2, 4); g.restore(); }
   // counter
+  if (t > 15.85) { g.save(); g.globalAlpha = clamp((t - 15.85) * 4); panel(250, 1060, 580, 470, C.mauveD, { so: 12 }); g.restore(); }
   if (t > 15.85) { const n = Math.round(easeOut((t - 15.9) / 1.35) * 454), pk = sp(t - 15.85, SNAPPY);
     drawT(ptext(AR(n), { size: 34, color: C.ivory, shadow: C.pink, shadowOff: 3 }), 540, 1150, 6, { sc: 0.7 + 0.3 * pk });
     const lk = sp(t - 17.38, SNAPPY);
@@ -507,9 +529,6 @@ function sRating(t) {
     const ti = 18.08 + (4 - i) * 0.12, on = t >= ti, k = sp(t - ti, PLAYFUL);
     const x = 540 + (i - 2) * 132; drawSpr(star5(on), x, 1430, on ? 8 * (0.7 + 0.3 * k) : 8);
   }
-  // real written reviews, one after another
-  ES25_REVIEWS.forEach(([q, ti], i) => { const nx = i + 1 < ES25_REVIEWS.length ? ES25_REVIEWS[i + 1][1] : 99;
-    if (t >= ti && t < nx + 0.15) { const out = clamp((nx + 0.15 - t) / 0.15); reviewCard(660, 1660, 700, q, sp(t - ti, PLAYFUL) * out, i % 2 ? 0.025 : -0.025); } });
   // rating stamp (store average today)
   const sk = sp(t - 18.8, SNAPPY);
   if (sk > 0) { g.save(); g.translate(850, 430); g.rotate(-0.22); g.scale(lerp(2.4, 1, sk), lerp(2.4, 1, sk)); g.globalAlpha = clamp(sk * 5);
