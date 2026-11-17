@@ -1,0 +1,4 @@
+function arch(cx, top, w, h, fill, border = C.ink) {
+  const r = w / 2; g.fillStyle = border; g.beginPath(); g.moveTo(cx - r - 6, top + h); g.lineTo(cx - r - 6, top + r); g.arc(cx, top + r, r + 6, Math.PI, 0); g.lineTo(cx + r + 6, top + h); g.fill();
+  g.fillStyle = fill; g.beginPath(); g.moveTo(cx - r, top + h); g.lineTo(cx - r, top + r); g.arc(cx, top + r, r, Math.PI, 0); g.lineTo(cx + r, top + h); g.fill();
+}
