@@ -1,506 +1,213 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>Kara Duo — Reel 05</title>
+<title>Kara Duo — Reel 05 · Beauty Artist</title>
 <link rel="stylesheet" href="fonts/fonts.css">
-<style>html,body{margin:0;background:#2a1f30;height:100%}canvas{display:block;height:100vh;margin:auto}</style>
+<style>html,body{margin:0;background:#EDE3F0;height:100%}canvas{display:block;height:100vh;margin:auto}</style>
 <canvas id="c" width="1080" height="1920"></canvas>
-<script src="env.js"></script>
 <script>
-// Kara Duo · Reel 05 "اكملي المجموعة" (Beauty Artist complete bag, 57 pieces) — every frame is a pure function of t (window.seek)
+// Kara Duo · Reel 05 "لوك كامل" — editorial luxury product film for the 57-piece Beauty Artist bag.
+// Light ivory/lavender stage, real product photos (white backgrounds dissolve via multiply), Playfair numerals, Cairo type.
+// Every frame is a pure function of t (window.seek).
 const W = 1080, H = 1920, DUR = 29.6;
-const cv = document.getElementById('c'), g = cv.getContext('2d');
+const g = document.getElementById('c').getContext('2d');
+const C = { ivory: '#FAF7F8', lav: '#D0B9D9', lavL: '#E7DAEC', lavLL: '#F3ECF6', lavD: '#A98BB5', mauve: '#654A70', mauveD: '#4F3859', ink: '#2B1C33', pink: '#DD4E94', pinkL: '#E98ABC', pinkLL: '#F8E1EE', blush: '#F6E7EF' };
 
-// ---------------- brand palette ----------------
-const C = {
-  ivory: '#FAF7F8', lav: '#D0B9D9', lavL: '#E7DAEC', lavLL: '#F3ECF6', lavD: '#A98BB5',
-  mauve: '#654A70', mauveD: '#4F3859', mauveDD: '#3E2B47', ink: '#2B1C33',
-  pink: '#DD4E94', pinkL: '#E98ABC', pinkLL: '#F3C3DC', pinkD: '#C93E82',
-};
-
-// ---------------- math ----------------
-const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
-const lerp = (a, b, k) => a + (b - a) * k;
-const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
-const easeIn = (x) => Math.pow(clamp(x), 3);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x)), lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3), easeIn = (x) => Math.pow(clamp(x), 3);
 const easeInOut = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
-function spring(t, k = 170, d = 26) {
-  if (t <= 0) return 0;
-  const w0 = Math.sqrt(k), z = d / (2 * w0);
-  if (z < 1) { const wd = w0 * Math.sqrt(1 - z * z);
-    return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t)); }
-  return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
-}
-const SNAPPY = [320, 24], DEFAULT = [170, 22], HEAVY = [110, 18], PLAYFUL = [240, 13];
-const sp = (t, preset = DEFAULT) => spring(t, preset[0], preset[1]);
-function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-  let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-  return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-function hex2rgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
-function mix(a, b, k) { const A = hex2rgb(a), B = hex2rgb(b); k = clamp(k);
-  return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], k))).join(',')})`; }
+const expo = (x) => { x = clamp(x); return x === 1 ? 1 : 1 - Math.pow(2, -10 * x); };
+function spring(t, k = 170, d = 26) { if (t <= 0) return 0; const w0 = Math.sqrt(k), z = d / (2 * w0);
+  if (z < 1) { const wd = w0 * Math.sqrt(1 - z * z); return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t)); }
+  return 1 - Math.exp(-w0 * t) * (1 + w0 * t); }
+const SOFT = (t) => spring(t, 120, 22), SILK = (t) => spring(t, 90, 19), POP = (t) => spring(t, 220, 18);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const AR = (n) => String(n).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
-const vis = (t, a, b) => t >= a && t < b;
 
-// ---------------- assets ----------------
 const IMG = {};
-const PALETTES = ['07707f44', '4093547d', '7314f8ff', 'a5768f9c', 'a938f01b', 'b6722ef8', 'd754fed1', '85389240',
-  'ec3f8d8c', 'ed15fa8d', '35da7493', '66da4d2b', '79580c51', 'd9d8e2f7', '1762cccf', '7096dce4', '24de4dfd'];
-const HERO = '81c5cd68';
-function loadImg(key, src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => { IMG[key] = i; res(); }; i.onerror = rej; i.src = src; }); }
+function loadImg(k, src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => { IMG[k] = i; res(); }; i.onerror = rej; i.src = src; }); }
+function tint(img, color) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); return c; }
 
-// recolour the transparent logo to a solid colour (approved white-on-mauve version)
-function tint(img, color) {
-  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-  const x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in';
-  x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); return c;
+function text(s, x, y, { size = 60, weight = 800, family = 'Cairo', color = C.mauve, align = 'center', alpha = 1, spacing = 0, maxW = 0, italic = false } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.font = `${italic ? 'italic ' : ''}${weight} ${size}px "${family}"`;
+  if (maxW) { const w = g.measureText(s).width; if (w > maxW) { size *= maxW / w; g.font = `${italic ? 'italic ' : ''}${weight} ${size}px "${family}"`; } }
+  if (spacing) g.letterSpacing = spacing + 'px'; g.fillStyle = color; g.textAlign = align; g.textBaseline = 'middle';
+  g.direction = /[؀-ۿ]/.test(s) ? 'rtl' : 'ltr'; g.fillText(s, x, y); g.restore();
 }
-
-// ---------------- pixel sprites ----------------
-// fn(x, y) -> colour or null on a small grid; auto 1px dark outline; cached; drawn with nearest-neighbour
-const SPR = new Map();
-function sprite(key, w, h, fn, outline = C.ink) {
-  if (SPR.has(key)) return SPR.get(key);
-  const grid = [];
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) grid[y * w + x] = fn(x, y);
-  const c = document.createElement('canvas'); c.width = w + 2; c.height = h + 2;
-  const x2 = c.getContext('2d');
-  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? null : grid[y * w + x];
-  if (outline) for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++)
-    if (!at(x, y) && (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1))) { x2.fillStyle = outline; x2.fillRect(x + 1, y + 1, 1, 1); }
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const col = at(x, y); if (col) { x2.fillStyle = col; x2.fillRect(x + 1, y + 1, 1, 1); } }
-  SPR.set(key, c); return c;
-}
-// draw sprite anchored at (ax, ay) relative point (0..1) with pixel size s
-function drawSpr(c, x, y, s, ax = 0.5, ay = 0.5, flip = false) {
-  g.save(); g.imageSmoothingEnabled = false; g.translate(Math.round(x), Math.round(y));
-  if (flip) g.scale(-1, 1);
-  g.drawImage(c, -c.width * s * ax, -c.height * s * ay, c.width * s, c.height * s); g.restore();
-}
-const inEll = (x, y, cx, cy, rx, ry) => ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1;
-
-// --- the host girl (placeholder until the brand character arrives) ---
-function girl(eyes = 'open', mouth = 'closed') {
-  return sprite(`girl:${eyes}:${mouth}`, 40, 46, (x, y) => {
-    const cx = 19.5;
-    const face = inEll(x, y, cx, 22.5, 9.6, 11) && y >= 12;
-    const hij = inEll(x, y, cx, 20, 15.2, 19.5);
-    const body = y >= 36 && Math.abs(x + 0.5 - cx) <= 12 + (y - 36) * 0.9;
-    // eyes
-    const eyeL = 15, eyeR = 23, ey = 21;
-    const dx = eyes === 'side' ? -1 : eyes === 'sideR' ? 1 : 0;
-    if (face) {
-      if (eyes === 'blink') { if (y === ey + 2 && (x >= eyeL - 1 + dx && x <= eyeL + 1 + dx || x >= eyeR - 1 + dx && x <= eyeR + 1 + dx)) return C.ink; }
-      else if (eyes === 'happy') {
-        for (const ex of [eyeL, eyeR]) { if ((y === ey + 1 && (x === ex - 1 || x === ex + 2)) || (y === ey && (x === ex || x === ex + 1))) return C.ink; }
-      } else {
-        for (const ex of [eyeL + dx, eyeR + dx]) {
-          if (x >= ex && x <= ex + 1 && y >= ey && y <= ey + 2) return (y === ey && x === ex + 1) ? '#FFFFFF' : '#3A2540';
-          if (y === ey && x === ex - 1 && ex < cx) return C.ink;        // lash flick
-          if (y === ey && x === ex + 2 && ex > cx) return C.ink;
-        }
-      }
-      if (y === 18 && ((x >= 14 && x <= 17) || (x >= 22 && x <= 25))) return '#7A5560';               // brows
-      if (y === 25 && (x === 13 || x === 14 || x === 25 || x === 26)) return C.pinkL;                   // cheeks
-      if (y === 25 && (x === 19 || x === 20)) return '#E3AE90';                                         // nose
-      // mouth
-      if (mouth === 'closed' && y === 28 && x >= 18 && x <= 21) return C.pinkD;
-      if (mouth === 'smile' && ((y === 28 && x >= 18 && x <= 21) || (y === 27 && (x === 17 || x === 22)))) return C.pinkD;
-      if (mouth === 'open') { if (y === 27 && x >= 18 && x <= 21) return C.pinkD; if (y === 28 && x >= 18 && x <= 21) return '#7A2448'; if (y === 29 && x >= 19 && x <= 20) return C.pinkD; }
-      if (mouth === 'o') { if ((y === 27 || y === 30) && x >= 19 && x <= 20) return C.pinkD; if ((y === 28 || y === 29) && (x === 18 || x === 21)) return C.pinkD; if ((y === 28 || y === 29) && x >= 19 && x <= 20) return '#7A2448'; }
-      if (y <= 13) return C.lavLL;                                                                       // hijab band
-      const edge = !inEll(x, y, cx, 22.5, 8.6, 10);
-      return edge ? '#EDBF9F' : '#F6D4BA';
-    }
-    if (y >= 12 && y <= 14 && x === 29) return C.pink;                                                  // hijab pin
-    if (y === 13 && (x === 28 || x === 30)) return C.pink;
-    if (hij) {
-      const nearFace = inEll(x, y, cx, 22.5, 11, 12.4);
-      if (nearFace) return '#B593C2';
-      return (x + y) % 9 === 0 && y > 4 ? '#C7A6D3' : '#CDAFD9';
-    }
-    if (body) return (x === 19 || x === 20) && y > 38 ? C.mauveD : '#4A3354';
-    return null;
-  });
-}
-// --- خزّوم: the Khuzama-flower mascot ---
-function mascot(eyes = 'open') {
-  return sprite(`m:${eyes}`, 30, 30, (x, y) => {
-    const cx = 14.5, cy = 14.5, px = x + 0.5 - cx, py = y + 0.5 - cy;
-    if (px * px + py * py <= 5.4 * 5.4) {                                    // face
-      if (eyes === 'blink') { if (y === 15 && (x === 12 || x === 17)) return C.ink; }
-      else if (eyes === 'wink') { if (y >= 13 && y <= 14 && x === 12) return C.ink; if (y === 14 && x >= 16 && x <= 18) return C.ink; }
-      else if (y >= 13 && y <= 14 && (x === 12 || x === 17)) return C.ink;
-      if (y === 17 && x >= 13 && x <= 16) return C.pinkD;
-      if (y === 16 && (x === 10 || x === 19)) return C.pinkL;
-      return C.ivory;
-    }
-    for (let k = 0; k < 4; k++) {                                            // four petals on the diagonals
-      const a = Math.PI / 4 + k * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
-      const u = px * ca + py * sa - 8.2, v = -px * sa + py * ca;
-      if ((u / 6.6) ** 2 + (v / 4.4) ** 2 <= 1) {
-        const pinkPetal = k % 2 === 1;
-        if (Math.abs(v) < 0.6 && u > -3 && u < 4) return pinkPetal ? C.pinkLL : C.lavLL;   // vein
-        return pinkPetal ? C.pinkL : C.lav;
-      }
-    }
-    return null;
-  });
-}
-// --- small icons ---
-const sparkle = (col = C.pink, core = C.ivory) => sprite(`sp:${col}`, 9, 9, (x, y) => {
-  const dx = Math.abs(x - 4), dy = Math.abs(y - 4);
-  if (dx === 0 && dy === 0) return core;
-  if ((dx === 0 && dy <= 4) || (dy === 0 && dx <= 4) || (dx <= 1 && dy <= 1)) return col; return null; }, null);
-function star5(filled) {
-  return sprite(`st:${filled}`, 13, 13, (x, y) => {
-    const pts = []; for (let i = 0; i < 10; i++) { const r = i % 2 ? 2.8 : 6.4, a = -Math.PI / 2 + i * Math.PI / 5; pts.push([6.5 + r * Math.cos(a), 6.9 + r * Math.sin(a)]); }
-    let inside = false; const px = x + 0.5, py = y + 0.5;
-    for (let i = 0, j = 9; i < 10; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j];
-      if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside; }
-    if (!inside) return null; return filled ? (y < 5 ? C.pinkL : C.pink) : C.mauveD; });
-}
-const QBLOCK = ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '...##...', '........', '...##...'];
-const qblock = () => sprite('qb', 16, 16, (x, y) => {
-  if (x === 0 || y === 0 || x === 15 || y === 15) return C.mauveDD;
-  if ((x === 2 || x === 13) && (y === 2 || y === 13)) return C.lavD;
-  const qx = x - 4, qy = y - 4; if (qx >= 0 && qx < 8 && qy >= 0 && qy < 8 && QBLOCK[qy][qx] === '#') return C.ivory;
-  return y < 3 ? C.pinkL : C.pink; });
-const sun = () => sprite('sun', 15, 15, (x, y) => { const dx = x - 7, dy = y - 7, r = Math.hypot(dx, dy);
-  if (r <= 3.6) return '#F6C9A0'; if (r > 4.6 && r < 7.2 && (dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy))) return C.pinkL; return null; });
-const moon = () => sprite('moon', 13, 13, (x, y) => (Math.hypot(x - 6, y - 6) <= 5.6 && Math.hypot(x - 8.6, y - 4.4) > 4.4) ? C.ivory : null);
-const HAND = ['....##......', '...#oo#.....', '...#oo#.....', '...#oo####..', '...#oo#oo#oo', '##.#oooooooo', '#o##oooooooo', '#oo#ooooooo#', '.#ooooooooo#', '..#oooooooo#', '...#oooooo#.', '....######..'];
-const hand = () => sprite('hand', 12, 12, (x, y) => { const ch = HAND[y][x]; return ch === '#' ? C.ink : ch === 'o' ? C.ivory : null; }, null);
-const mag = () => sprite('mag', 11, 11, (x, y) => { const r = Math.hypot(x - 4, y - 4);
-  if (r >= 2.6 && r <= 4.2) return C.mauve; if (x - y === 0 && x >= 7 && x <= 10) return C.mauve; if (x - y === 1 && x >= 8 && x <= 10) return C.mauve; return null; }, null);
-const flowerTile = () => sprite('fl', 16, 16, (x, y) => {
-  const px = x + 0.5 - 8, py = y + 0.5 - 8; if (Math.abs(px) < 1.2 && Math.abs(py) < 1.2) return C.pink;
-  for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, u = px * Math.cos(a) + py * Math.sin(a) - 4.2, v = -px * Math.sin(a) + py * Math.cos(a);
-    if ((u / 3.6) ** 2 + (v / 2.3) ** 2 <= 1) return k % 2 ? '#C77BA8' : '#9E7FB0'; } return null; }, null);
-
-// ---------------- the creator's avatar (cut from her character sheet) ----------------
-const FACES = ['neutral', 'wink', 'laugh', 'oh', 'think', 'love', 'coffee', 'selfie'];
-function drawAv(key, x, yb, s, { ax = 0.5, alpha = 1, rot = 0 } = {}) {      // anchored bottom-centre
-  const im = IMG['av_' + key]; if (!im) return;
-  g.save(); g.globalAlpha *= alpha; g.imageSmoothingEnabled = false; g.translate(Math.round(x), Math.round(yb)); g.rotate(rot);
-  g.drawImage(im, -im.width * s * ax, -im.height * s, im.width * s, im.height * s); g.restore();
-}
-function bulb(x, y, s, t0, t) {                                             // pixel lightbulb with rays
-  const k = sp(t - t0, PLAYFUL); if (k <= 0) return;
-  const B = ['..####..', '.######.', '########', '########', '########', '.######.', '..####..', '..#--#..', '..####..', '...##...'];
-  g.save(); g.translate(x, y); g.scale(k, k); const c = s;
-  B.forEach((row, yy) => [...row].forEach((ch, xx) => { if (ch === '.') return; g.fillStyle = ch === '#' ? (yy < 7 ? (xx < 3 && yy < 4 ? '#FFF3C4' : '#F7C948') : C.lavD) : C.mauveDD; g.fillRect((xx - 4) * c, (yy - 5) * c, c, c); }));
-  const pulse = 0.6 + 0.4 * Math.abs(Math.sin((t - t0) * 6));
-  g.fillStyle = '#F7C948';
-  for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + (i - 3.5) * 0.42; if (i === 0 || i === 7) continue;
-    for (let j = 0; j < 2; j++) { const r = (7.2 + j * 1.6) * c * pulse + 4 * c; g.fillRect(Math.cos(a) * r - c / 2, Math.sin(a) * r - c * 1.5, c, c); } }
-  g.restore();
-}
-
-// ---------------- pixel text (thresholded, upscaled) ----------------
-const TXT = new Map();
-function ptext(str, { size = 22, weight = 900, family = 'Cairo', color = C.ivory, shadow = null, shadowOff = 1, outline = null } = {}) {
-  const key = [str, size, weight, family, color, shadow, outline].join('|');
-  if (TXT.has(key)) return TXT.get(key);
-  const font = `${weight} ${size}px "${family}"`;
-  const m = document.createElement('canvas').getContext('2d'); m.font = font;
-  const w = Math.ceil(m.measureText(str).width) + 6, h = Math.ceil(size * 1.9);
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const x = c.getContext('2d'); x.font = font; x.textBaseline = 'middle'; x.textAlign = 'center'; x.direction = /[\u0600-\u065F\u066E-\u06FF]/.test(str) ? 'rtl' : 'ltr';
-  x.fillStyle = '#000'; x.fillText(str, w / 2, h / 2);
-  const id = x.getImageData(0, 0, w, h), d = id.data, mask = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) mask[i] = d[i * 4 + 3] > 110 ? 1 : 0;
-  const out = x.createImageData(w, h), o = out.data;
-  const put = (i, col) => { const [r, gg, b] = hex2rgb(col); o[i * 4] = r; o[i * 4 + 1] = gg; o[i * 4 + 2] = b; o[i * 4 + 3] = 255; };
-  if (outline) for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const i = yy * w + xx; if (mask[i]) continue;
-    if ((xx > 0 && mask[i - 1]) || (xx < w - 1 && mask[i + 1]) || (yy > 0 && mask[i - w]) || (yy < h - 1 && mask[i + w])) put(i, outline); }
-  if (shadow) for (let i = 0; i < w * h; i++) { const j = i - shadowOff * w - shadowOff; if (j >= 0 && mask[j] && !mask[i]) put(i, shadow); }
-  for (let i = 0; i < w * h; i++) if (mask[i]) put(i, color);
-  x.putImageData(out, 0, 0); TXT.set(key, c); return c;
-}
-function drawT(c, x, y, s, { ax = 0.5, ay = 0.5, rot = 0, sc = 1, alpha = 1 } = {}) {
-  g.save(); g.globalAlpha *= alpha; g.imageSmoothingEnabled = false; g.translate(x, y); g.rotate(rot); g.scale(sc, sc);
-  g.drawImage(c, -c.width * s * ax, -c.height * s * ay, c.width * s, c.height * s); g.restore();
-}
-// one line built word by word (RTL): words = [[text, time], ...]
-function wordLine(t, words, cx, y, s, style, { pop = SNAPPY, gap = 0.28 } = {}) {
-  const cs = words.map(([w]) => ptext(w, style)), sp0 = style.size * gap;
-  const ws = cs.map((c) => c.width), total = ws.reduce((a, b) => a + b, 0) + sp0 * (cs.length - 1);
-  let xr = cx + total * s / 2;                                   // start from the right edge
-  cs.forEach((c, i) => {
-    const k = sp(t - words[i][1], pop);
-    if (k > 0.001) drawT(c, xr - ws[i] * s / 2, y + (1 - k) * 40, s, { sc: 0.6 + 0.4 * k, alpha: clamp(k * 3) });
-    xr -= (ws[i] + sp0) * s;
-  });
-}
-// clean (non-pixel) text
-function text(str, x, y, { size = 60, weight = 800, family = 'Cairo', color = C.ivory, align = 'center', spacing = 0, alpha = 1 } = {}) {
-  g.save(); g.globalAlpha *= alpha; g.font = `${weight} ${size}px "${family}"`; g.fillStyle = color; g.textAlign = align; g.textBaseline = 'middle';
-  if (spacing) g.letterSpacing = spacing + 'px'; if (/[؀-ۿ]/.test(str)) g.direction = 'rtl'; g.fillText(str, x, y); g.restore();
-}
-
-// ---------------- pixel UI blocks ----------------
-// stepped-corner panel with hard drop shadow
-function panel(x, y, w, h, fill, { border = C.ink, bw = 6, step = 12, shadow = 'rgba(30,18,38,.45)', so = 12 } = {}) {
-  const path = (ox, oy, ww, hh, st) => { g.beginPath(); g.moveTo(ox + st, oy); g.lineTo(ox + ww - st, oy); g.lineTo(ox + ww - st, oy + st / 2); g.lineTo(ox + ww - st / 2, oy + st / 2);
-    g.lineTo(ox + ww - st / 2, oy + st); g.lineTo(ox + ww, oy + st); g.lineTo(ox + ww, oy + hh - st); g.lineTo(ox + ww - st / 2, oy + hh - st); g.lineTo(ox + ww - st / 2, oy + hh - st / 2);
-    g.lineTo(ox + ww - st, oy + hh - st / 2); g.lineTo(ox + ww - st, oy + hh); g.lineTo(ox + st, oy + hh); g.lineTo(ox + st, oy + hh - st / 2); g.lineTo(ox + st / 2, oy + hh - st / 2);
-    g.lineTo(ox + st / 2, oy + hh - st); g.lineTo(ox, oy + hh - st); g.lineTo(ox, oy + st); g.lineTo(ox + st / 2, oy + st); g.lineTo(ox + st / 2, oy + st / 2); g.lineTo(ox + st, oy + st / 2); g.closePath(); };
-  if (shadow) { g.fillStyle = shadow; path(x + so, y + so, w, h, step); g.fill(); }
-  if (border) { g.fillStyle = border; path(x, y, w, h, step); g.fill(); }
-  g.fillStyle = fill; path(x + bw, y + bw, w - 2 * bw, h - 2 * bw, Math.max(0, step - bw)); g.fill();
-}
-// speech bubble with tail pointing to (tx, ty)
-function bubble(cx, cy, w, h, tx, ty, fill = C.ivory) {
-  g.save(); g.fillStyle = C.ink; g.beginPath();
-  const bx = clamp(tx, cx - w / 2 + 40, cx + w / 2 - 80), by = cy + h / 2 - 4;
-  g.moveTo(bx, by); g.lineTo(bx + 46, by); g.lineTo(tx, ty); g.closePath(); g.fill();
-  g.fillStyle = fill; g.beginPath(); g.moveTo(bx + 8, by - 6); g.lineTo(bx + 38, by - 6); g.lineTo(tx + (bx + 23 - tx) * 0.22, ty - (ty - by) * 0.22); g.closePath(); g.fill();
-  g.restore(); panel(cx - w / 2, cy - h / 2, w, h, fill, { so: 10 });
-}
-function pill(cx, cy, w, h, fill, border = C.ink) { panel(cx - w / 2, cy - h / 2, w, h, fill, { border, bw: 6, step: Math.min(h / 2, 24), so: 8 }); }
-
-// ---------------- backgrounds & transitions ----------------
-function bg(base, dot, drift = 0) {
-  g.fillStyle = base; g.fillRect(0, 0, W, H);
-  g.fillStyle = dot; const s = 48, off = drift % s;
-  for (let y = -s; y < H + s; y += s) for (let x = 0; x < W + s; x += s) g.fillRect(x - off + 22, y + off * 0.5 + 22, 6, 6);
-}
-function gridBg(base, line) {
-  g.fillStyle = base; g.fillRect(0, 0, W, H); g.fillStyle = line;
-  for (let x = 0; x <= W; x += 60) g.fillRect(x, 0, 2, H); for (let y = 0; y <= H; y += 60) g.fillRect(0, y, W, 2);
-}
-// pixel block wipe centred on time tc (covers fully at tc)
-function blockWipe(t, tc, color, dur = 0.34) {
-  const k = 1 - Math.abs((t - tc) / (dur / 2)); if (k <= 0) return;
-  const r = rng(99), B = 90;
-  g.fillStyle = color;
-  for (let y = 0; y < H; y += B) for (let x = 0; x < W; x += B) {
-    const thr = (r() * 0.6 + (Math.abs(x - W / 2) / W + Math.abs(y - H / 2) / H) * 0.4);
-    if (k > thr * 0.95) g.fillRect(x, y, B, B);
-  }
-}
-
-// ---------------- camera shake (pure function of t) ----------------
-const HITS = [[5.8, 12], [15.9, 10], [22.55, 10]];
-function shake(t) { let x = 0, y = 0;
-  for (const [th, a] of HITS) { const d = t - th; if (d < 0 || d > 0.5) continue; const e = a * Math.exp(-d * 12);
-    x += e * Math.sin(d * 90 + th); y += e * Math.cos(d * 77 + th * 3); } return [x, y]; }
-
-// ---------------- talking & blinking ----------------
-function vo(t) { const e = window.VO_ENV || []; return e[Math.min(e.length - 1, Math.max(0, Math.floor(t * 60)))] || 0; }
-function girlFace(t, eyesDefault, mouthDefault) {
-  const v = vo(t), open = v > 0.16;
-  const mouth = open ? (Math.floor(t * 14) % 3 === 0 ? 'o' : 'open') : mouthDefault;
-  const blink = (t % 3.1) < 0.09 || (t > 12.9 && t < 12.98);
-  return girl(blink ? 'blink' : eyesDefault, mouth);
-}
-
-// ================= SCENES =================
-// space-y pixel stage (the shades are Lunar / Galaxy / Cosmic / Moon)
-function space(t, base = C.mauveDD) {
-  g.fillStyle = base; g.fillRect(0, 0, W, H);
-  const r = rng(77);
-  for (let i = 0; i < 70; i++) {
-    const x = r() * W, y = r() * H, s = r() < 0.15 ? 10 : 6, tw = Math.sin(t * (2 + r() * 3) + i);
-    if (tw > -0.3) { g.fillStyle = i % 9 === 0 ? C.pinkL : i % 4 === 0 ? C.lav : C.lavL; g.globalAlpha = 0.35 + 0.5 * (tw + 0.3) / 1.3; g.fillRect(x, (y + t * 14 * (s / 6)) % H, s, s); }
-  }
-  g.globalAlpha = 1;
-}
-function photo(key, cx, cy, w, { rot = 0, alpha = 1, frame = null, shadow = true } = {}) {
-  const im = IMG[key]; if (!im) return; const h = w * im.height / im.width;
-  g.save(); g.globalAlpha *= alpha; g.translate(cx, cy); g.rotate(rot); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-  if (frame) panel(-w / 2 - 14, -h / 2 - 14, w + 28, h + 28, frame, { so: 14 });
-  if (shadow && !frame) { g.shadowColor = 'rgba(20,10,28,.5)'; g.shadowBlur = 34; g.shadowOffsetY = 18; }
+// text revealed by a mask that slides up (classic editorial reveal)
+function revealText(s, x, y, k, opt = {}) { if (k <= 0) return; const size = opt.size || 60;
+  g.save(); g.beginPath(); g.rect(0, y - size * 0.95, W, size * 1.9); g.clip(); text(s, x, y + (1 - easeOut(k)) * size * 1.2, { ...opt, alpha: (opt.alpha ?? 1) * clamp(k * 2) }); g.restore(); }
+// product photo on white, dissolved into the light background
+function product(key, cx, cy, h, { rot = 0, alpha = 1, shadow = true } = {}) {
+  const im = IMG[key]; if (!im || h <= 0) return; const w = h * im.width / im.height;
+  g.save(); g.translate(cx, cy); g.rotate(rot); g.globalAlpha *= alpha;
+  if (shadow) { g.save(); g.globalAlpha *= 0.35; const gr = g.createRadialGradient(0, h * 0.5, 0, 0, h * 0.5, w * 0.6); gr.addColorStop(0, 'rgba(101,74,112,.55)'); gr.addColorStop(1, 'rgba(101,74,112,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(0, h * 0.5, w * 0.6, h * 0.08, 0, 0, Math.PI * 2); g.fill(); g.restore(); }
+  g.globalCompositeOperation = 'multiply'; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
   g.drawImage(im, -w / 2, -h / 2, w, h); g.restore();
-  return h;
 }
-function rays(cx, cy, r, t, alpha) {
-  g.save(); g.translate(cx, cy); g.rotate(t * 0.5); g.globalAlpha = alpha;
-  for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? 'rgba(255,243,196,.55)' : 'rgba(243,195,220,.35)';
-    g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r, i * Math.PI / 6, i * Math.PI / 6 + Math.PI / 12); g.closePath(); g.fill(); }
+function hairline(x0, y0, x1, y1, k, col = C.lavD, w = 3) { if (k <= 0) return; g.save(); g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.lineTo(lerp(x0, x1, easeOut(k)), lerp(y0, y1, easeOut(k))); g.stroke(); g.restore(); }
+function sparkle(x, y, r, col = C.pink, a = 1) { if (r <= 0) return; g.save(); g.globalAlpha *= a; g.fillStyle = col; g.beginPath();
+  g.moveTo(x, y - r); g.quadraticCurveTo(x, y, x + r, y); g.quadraticCurveTo(x, y, x, y + r); g.quadraticCurveTo(x, y, x - r, y); g.quadraticCurveTo(x, y, x, y - r); g.fill(); g.restore(); }
+function pill(cx, cy, w, h, fill) { g.save(); g.shadowColor = 'rgba(101,74,112,.25)'; g.shadowBlur = 30; g.shadowOffsetY = 12; g.fillStyle = fill; g.beginPath(); g.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2); g.fill(); g.restore(); }
+function logo(cx, cy, w, col = 'M', a = 1) { const L = col === 'M' ? IMG.logoM : IMG.logoW; if (!L) return; const h = w * L.height / L.width; g.save(); g.globalAlpha *= a; g.drawImage(L, cx - w / 2, cy - h / 2, w, h); g.restore(); }
+
+// ---------- stage ----------
+function stage(t, tone = 0) {
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, C.ivory); gr.addColorStop(1, tone ? '#EFE2F3' : '#F4EBF4'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.save(); g.filter = 'blur(90px)'; g.globalAlpha = 0.55;
+  [[200, 400, 260, C.pinkLL], [900, 1300, 320, C.lavL], [300, 1750, 280, C.lavLL]].forEach(([x, y, r, c], i) => { g.fillStyle = c; g.beginPath(); g.arc(x + Math.sin(t * 0.3 + i) * 50, y + Math.cos(t * 0.25 + i) * 40, r, 0, Math.PI * 2); g.fill(); });
   g.restore();
 }
+function grain(t) { const r = rng(Math.floor(t * 24) + 7); g.save(); g.globalAlpha = 0.05; for (let i = 0; i < 900; i++) { g.fillStyle = r() > 0.5 ? '#fff' : '#654A70'; g.fillRect(r() * W, r() * H, 2, 2); } g.restore(); }
+function sweep(t, t0, dur = 0.9, a = 0.55) { const d = (t - t0) / dur; if (d < 0 || d > 1) return; g.save(); g.globalCompositeOperation = 'screen'; g.translate(lerp(-500, W + 500, easeInOut(d)), H / 2); g.rotate(0.35);
+  const gr = g.createLinearGradient(-160, 0, 160, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(-160, -1500, 320, 3000); g.restore(); }
 
-function arch(cx, top, w, h, fill, border = C.ink) {
-  const r = w / 2; g.fillStyle = border; g.beginPath(); g.moveTo(cx - r - 6, top + h); g.lineTo(cx - r - 6, top + r); g.arc(cx, top + r, r + 6, Math.PI, 0); g.lineTo(cx + r + 6, top + h); g.fill();
-  g.fillStyle = fill; g.beginPath(); g.moveTo(cx - r, top + h); g.lineTo(cx - r, top + r); g.arc(cx, top + r, r, Math.PI, 0); g.lineTo(cx + r, top + h); g.fill();
-}
-// ---------- reel 05: "اكملي المجموعة" — the 57-piece Beauty Artist bag as a collection game ----------
-const FACES5 = ['neutral', 'content', 'laugh', 'wink', 'think', 'love', 'drink', 'cool'];
-const PRODS = ['1762cccf', '7096dce4', '81c5cd68', '66da4d2b', 'a42d1681', '299c778a', '9b922240', 'b817a335', '46a8fb5d', '12c8e6d9', 'ef804147'];
-const GX = 150, GY = 560, GC = 7, GR = 9, CELL = 112;            // 7 x 9 = 63 slots, 57 used
-const slot = (i) => [GX + (GC - 1 - (i % GC)) * CELL + CELL / 2, GY + Math.floor(i / GC) * CELL + CELL / 2];   // RTL fill order
-
-function inventory(t, filled, { alpha = 1, glow = 0 } = {}) {
-  g.save(); g.globalAlpha *= alpha;
-  panel(GX - 30, GY - 30, GC * CELL + 60, GR * CELL + 60, C.mauveDD, { so: 14 });
-  for (let i = 0; i < GC * GR; i++) {
-    const [x, y] = slot(i), used = i < 57, on = i < filled;
-    g.fillStyle = C.ink; g.fillRect(x - 48, y - 48, 96, 96);
-    g.fillStyle = !used ? '#3A2944' : on ? C.lav : C.mauve; g.fillRect(x - 44, y - 44, 88, 88);
-    if (on) { const id = PRODS[i % PRODS.length], im = IMG[id]; if (im) { const s = Math.min(76 / im.width, 76 / im.height); g.imageSmoothingEnabled = true; g.drawImage(im, x - im.width * s / 2, y - im.height * s / 2, im.width * s, im.height * s); } }
-    if (on && glow > 0) { g.fillStyle = `rgba(255,255,255,${glow * 0.5})`; g.fillRect(x - 44, y - 44, 88, 88); }
-  }
-  g.restore();
-}
-function counter(n, x, y, s, k = 1) {
-  drawT(ptext(`${AR(n)}/${AR(57)}`, { size: 22, color: '#F7C948', shadow: C.ink, shadowOff: 2 }), x, y, s, { sc: k });
-}
-function statCard(cx, cy, w, label, count, img, k, col) {
-  if (k <= 0) return;
-  g.save(); g.translate(cx, cy); g.scale(0.5 + 0.5 * k, 0.5 + 0.5 * k); g.globalAlpha *= clamp(k * 3);
-  panel(-w / 2, -110, w, 220, C.ivory, { so: 10 });
-  g.fillStyle = col; g.fillRect(w / 2 - 22, -104, 16, 208);
-  if (img && IMG[img]) { const im = IMG[img], s = Math.min(170 / im.width, 170 / im.height); g.imageSmoothingEnabled = true; g.drawImage(im, -w / 2 + 25 + (170 - im.width * s) / 2, -im.height * s / 2, im.width * s, im.height * s); }
-  else { for (let i = 0; i < 3; i++) drawSpr(sparkle(i % 2 ? C.lavD : C.pink), -w / 2 + 70 + i * 45, (i % 2 ? 20 : -20), 6); }
-  text(label, w / 2 - 45, -30, { size: 44, weight: 800, color: C.mauve, align: 'right', maxW: w - 250 });
-  drawT(ptext(`×${AR(count)}`, { size: 20, color: C.pink }), w / 2 - 110, 50, 4);
-  g.restore();
-}
-
-// ---------- host: one fixed expression per scene (bottom-left) ----------
-const HOST = [[3.6, 'laugh'], [6.3, 'cool'], [13.9, 'love']];
-function drawHost(t) {
-  if (t < 3.6 || t >= 18.3) return;
-  let face = HOST[0][1], t0 = HOST[0][0]; for (const [a, f] of HOST) if (t >= a) { face = f; t0 = a; }
-  const k = sp(t - 3.6, PLAYFUL), pop = t0 > 3.6 ? 1 + 0.08 * Math.exp(-(t - t0) * 9) * Math.sin(Math.min(Math.PI, (t - t0) * 14)) : 1;
-  drawAv('face_' + face, 150, 1935 + (1 - k) * 320 + Math.sin(t * 4.2) * 4, 1.45 * pop);
-}
-
-// -------- S1 opening 0–3.6: an empty 57-slot collection book + her, thinking --------
+// ================= S1 opening 0–4.9: macro of the bag's line-art face, slow pull-back =================
 function sOpen(t) {
-  space(t, C.mauveDD);
-  const lk = sp(t - 0.05, SNAPPY);
-  if (lk > 0) { const L = IMG.logoW, w = 420 * (0.7 + 0.3 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 2); g.drawImage(L, W / 2 - w / 2, 230 - h / 2, w, h); g.restore(); }
-  const ik = sp(t - 0.15, [200, 18]);
-  g.save(); g.translate(540, 1060); g.scale(0.8 + 0.2 * ik, 0.8 + 0.2 * ik); g.translate(-540, -1060); inventory(t, 0, { alpha: clamp(ik * 3) }); g.restore();
-  // "?" blinks in every empty slot, in a wave
-  for (let i = 0; i < 57; i++) { const [x, y] = slot(i), d = t - 0.4 - i * 0.012; if (d > 0 && Math.sin(t * 6 + i) > 0.2) drawT(ptext('؟', { size: 14, color: C.lavD }), x, y - 4, 3.4, { sc: clamp(d * 5) }); }
-  wordLine(t, [['تخيلي…', 0.3], ['مكياجك', 1.35], ['كله', 2.05]], W / 2, 360, 3.9, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
-  if (t > 2.5) wordLine(t, [['في', 2.55], ['شنطة', 2.7], ['وحدة!', 3.0]], W / 2, 470, 4.6, { size: 22, color: C.pinkL, shadow: C.ink, shadowOff: 2 });
-  const bk = sp(t - 0.2, [180, 20]), out = easeIn((t - 3.35) / 0.25);
-  drawAv('bust', 700, 1960 + (1 - bk) * 300 + out * 1100 + Math.sin(t * 3) * 6, 1.2);
+  stage(t);
+  const z = lerp(3.6, 1, easeInOut((t - 0.1) / 4.3)), im = IMG.bagc, h = 640 * z, w = h * im.width / im.height;
+  // focus point: the illustrated face on the bag front (fraction of the photo)
+  const fx = 0.25, fy = 0.42, ax = lerp(540, 540, 0), ay = lerp(1020, 1230, easeInOut((t - 0.1) / 4.3));
+  g.save(); g.globalAlpha = clamp(t * 3); g.translate(ax - (fx - 0.5) * w * lerp(1, 0, easeInOut((t - 0.1) / 4.3)), ay - (fy - 0.5) * h * lerp(1, 0, easeInOut((t - 0.1) / 4.3)));
+  g.globalCompositeOperation = 'multiply'; g.imageSmoothingQuality = 'high'; g.drawImage(im, -w / 2, -h / 2, w, h); g.restore();
+  // a soft ivory veil over the top for the type
+  const vg = g.createLinearGradient(0, 0, 0, 820); vg.addColorStop(0, 'rgba(250,247,248,.96)'); vg.addColorStop(1, 'rgba(250,247,248,0)'); g.fillStyle = vg; g.fillRect(0, 0, W, 820);
+  text('KARA DUO  ·  BEAUTY ARTIST', 540, 150, { size: 24, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 8, alpha: clamp((t - 0.3) * 2) });
+  revealText('لوك كامل', 540, 310, (t - 1.0) / 0.45, { size: 170, weight: 900, color: C.mauve });
+  hairline(340, 425, 740, 425, (t - 1.7) / 0.6, C.pinkL, 4);
+  revealText('من أول خطوة… لآخر لمسة', 540, 500, (t - 2.0) / 0.5, { size: 58, weight: 600, color: C.mauveD });
+  sweep(t, 3.4, 1.1, 0.7);
+  for (let i = 0; i < 5; i++) { const r = rng(10 + i), x = 200 + r() * 680, y = 760 + r() * 900, ti = 3.5 + i * 0.12; sparkle(x, y, 18 * Math.sin(clamp((t - ti) / 0.9) * Math.PI), i % 2 ? C.pinkL : C.ivory, 0.9); }
 }
 
-// -------- S2 3.6–6.3: real products rain into the slots, counter to 57 --------
-function sFill(t) {
-  space(t, C.mauveDD);
-  const T0 = 3.75, n = Math.min(57, Math.floor(clamp((t - T0) / 2.0) * 57));
-  inventory(t, n, { glow: t > 5.8 ? Math.max(0, Math.sin((t - 5.8) * 20)) * 0.6 : 0 });
-  // the next few items are falling into their slots
-  for (let i = n; i < Math.min(57, n + 6); i++) { const ti = T0 + i / 57 * 2.0, d = (ti - t) / 0.35; if (d < 0 || d > 1) continue;
-    const [x, y] = slot(i), id = PRODS[i % PRODS.length], im = IMG[id]; if (!im) continue; const s = Math.min(150 / im.width, 150 / im.height) * (1 + d);
-    g.save(); g.globalAlpha = 1 - d * 0.3; g.drawImage(im, x - im.width * s / 2, y - 700 * d - im.height * s / 2, im.width * s, im.height * s); g.restore(); }
-  const ck = sp(t - 3.7, SNAPPY);
-  counter(n, 540, 400, 5.2, 0.8 + 0.2 * ck);
-  if (t > 4.5) wordLine(t, [['قطعة', 4.6], ['من', 4.95], ['كارا', 5.1], ['دو', 5.35]], W / 2, 260, 4.2, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
-  if (n >= 57) { const k = sp(t - 5.8, PLAYFUL); drawT(ptext('COMPLETE!', { size: 14, weight: 400, family: 'Press Start 2P', color: '#F7C948', outline: C.ink }), 540, 1640, 5, { sc: k, rot: -0.05 }); }
-}
-
-// -------- S3 6.3–13.9: what's inside, category by category (real product photos) --------
-const CATS = [
-  ['باليتات', 7, '1762cccf', 6.75, C.pink],
-  ['إضاءة', 18, 'tube_gold', 9.15, '#D9A93A'],
-  ['كونتور وبلاشر', 12, '299c778a', 9.75, '#B0703F'],
-  ['شفايف', 6, 'ef804147', 11.0, C.pinkD],
-  ['تحضير وتثبيت', 8, null, 12.1, C.lavD],
-  ['عيون وحواجب', 5, 'b817a335', 12.6, C.mauve],
+// ================= S2 the 8 steps 4.9–11.9 =================
+const STEPS = [
+  ['تحضير', 'PREP', 5.11, [['primer', 0, 0, 760, -0.06]], C.ivory],
+  ['تصحيح', 'CORRECT', 5.98, [['cn1', 0, 0, 380, 0.04]], '#F7EEF4'],
+  ['كونتور', 'CONTOUR', 6.86, [['contour', 0, 0, 700, -0.05]], '#F4ECE7'],
+  ['بلاشر', 'BLUSH', 7.73, [['flora', 60, -40, 500, 0.06], ['liqblush', -250, 90, 560, -0.1]], '#FBEAF1'],
+  ['عيون', 'EYES', 8.51, [['pro12', 40, -60, 560, -0.04], ['mascara', -300, 120, 640, 0.12], ['brow', 330, 160, 600, -0.18]], '#F1ECF6'],
+  ['إضاءة', 'GLOW', 9.30, [['halo', 160, -120, 400, 0.05], ['starx', -270, 40, 620, -0.08], ['glowcrush', 170, 260, 430, 0.04]], '#FBF3EA'],
+  ['شفايف', 'LIPS', 10.04, [['radrouge', 120, -40, 560, 0.04], ['vibeout', -290, 60, 700, -0.08]], '#FCE9EE'],
+  ['تثبيت', 'SET', 11.0, [['spray', -280, 0, 640, -0.04], ['loose', 150, -170, 420, 0.03], ['blur', 170, 250, 430, -0.03]], '#F2EEF7'],
 ];
-function sCats(t) {
-  space(t, C.mauve);
-  drawT(ptext('INSIDE THE BAG', { size: 10, weight: 400, family: 'Press Start 2P', color: '#F7C948', outline: C.ink }), 540, 250, 4.6, { sc: sp(t - 6.35, SNAPPY) });
-  CATS.forEach(([lab, cnt, img, ti], i) => {
-    const k = sp(t - ti, PLAYFUL), x = i % 2 ? 285 : 795, y = 480 + Math.floor(i / 2) * 270;
-    statCard(lerp(x + (i % 2 ? -400 : 400), x, clamp(k * 1.2)), y, 490, lab, cnt, img, k, CATS[i][4]);
-  });
-  // running total
-  let total = 0; CATS.forEach(([, c, , ti]) => { if (t >= ti) total += c; }); if (t >= 13.0) total = 57;
-  const tk = sp(t - 6.8, SNAPPY);
-  if (tk > 0) { g.save(); g.translate(600, 1330); g.scale(tk, tk); pill(0, 0, 640, 130, C.ink, C.ink); drawT(ptext('المجموع', { size: 16, color: C.lavL }), 190, -2, 3.6); counter(total, -110, 0, 3.6); g.restore(); }
-  const bk = sp(t - 13.0, PLAYFUL); if (bk > 0) { g.save(); g.translate(250, 1220); g.rotate(-0.06); g.scale(bk, bk); pill(0, 0, 330, 88, C.pink); drawT(ptext('+ فرشاة ×١', { size: 15, color: C.ivory }), 0, -2, 3.4); g.restore(); }
-  if (t > 12.1) wordLine(t, [['من', 12.0], ['البرايمر', 12.15], ['لين', 12.85], ['التثبيت!', 13.1]], 600, 1500, 3.8, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
-}
-
-// -------- S4 13.9–18.3: the real bag — wheels, opens, dividers, 4 clear pouches --------
-function sBag(t) {
-  space(t, C.mauveDD);
-  const rk = sp(t - 13.95, [120, 15]), open = clamp((t - 15.9) / 0.35);
-  if (open < 1) { g.save(); g.globalAlpha = 1 - open; g.fillStyle = 'rgba(20,10,28,.45)'; g.beginPath(); g.ellipse(lerp(1500, 540, rk), 1310, 290, 32, 0, 0, Math.PI * 2); g.fill();
-    photo('bagc', lerp(1500, 540, rk), 1020, 620, { rot: (1 - rk) * -0.1, shadow: false }); g.restore(); }
-  if (open > 0) { const k = sp(t - 15.9, [160, 16]); photo('bago', 540, 1010, 640 * (0.85 + 0.15 * k), { alpha: open }); }
-  wordLine(t, [['وكلها', 14.1], ['مرتبة', 14.55]], W / 2, 330, 5, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
-  // callouts
-  const cw = sp(t - 15.5, PLAYFUL);
-  if (cw > 0 && open < 0.5) { g.save(); g.translate(830, 1450); g.scale(cw, cw); g.beginPath(); g.arc(0, 0, 150, 0, Math.PI * 2); g.fillStyle = C.ink; g.fill(); g.beginPath(); g.arc(0, 0, 140, 0, Math.PI * 2); g.clip();
-    const im = IMG.wheel; g.drawImage(im, -150, -170, 300, 300 * im.height / im.width); g.restore(); pill(830, 1640, 300, 90, C.pink); drawT(ptext('عجلات', { size: 16, color: C.ivory }), 830, 1638, 3.6); }
-  const ck = sp(t - 16.25, PLAYFUL); if (ck > 0) { g.save(); g.translate(270, 640); g.rotate(-0.05); g.scale(ck, ck); pill(0, 0, 300, 96, C.pink); drawT(ptext('فواصل', { size: 16, color: C.ivory }), 0, -2, 3.6); g.restore(); }
-  const pk = sp(t - 17.2, PLAYFUL); if (pk > 0) { g.save(); g.translate(800, 640); g.rotate(0.05); g.scale(pk, pk); pill(0, 0, 400, 96, C.mauveD); drawT(ptext('٤ شنط شفافة', { size: 16, color: C.ivory }), 0, -2, 3.6); g.restore(); }
-}
-
-// -------- S5 18.3–22.4: character select — who is it for --------
-const WHO = [['الميكب آرتست', 'cool', 18.55], ['العروس', 'love', 19.7], ['المبتدئة', 'content', 20.7]];
-function sWho(t) {
-  space(t, C.mauve);
-  drawT(ptext('SELECT PLAYER', { size: 11, weight: 400, family: 'Press Start 2P', color: '#F7C948', outline: C.ink }), 540, 330, 4.6, { sc: sp(t - 18.35, SNAPPY) });
-  let sel = -1; WHO.forEach(([, , ti], i) => { if (t >= ti) sel = i; });
-  WHO.forEach(([lab, face, ti], i) => {
-    const k = sp(t - ti, PLAYFUL); if (k <= 0) return;
-    const x = 850 - i * 310, y = 1000, on = i === sel;
-    g.save(); g.translate(x, y + (on ? -20 : 0)); g.scale((0.6 + 0.4 * k) * 1.08, (0.6 + 0.4 * k) * 1.08);
-    panel(-135, -230, 270, 460, on ? C.pinkLL : C.lavLL, { border: on ? C.pink : C.ink, bw: on ? 10 : 6, so: 12 });
-    g.save(); g.beginPath(); g.rect(-125, -220, 250, 330); g.clip(); drawAv('face_' + face, 0, 115, 1.75); g.restore();
-    text(lab, 0, 170, { size: lab.length > 8 ? 34 : 42, weight: 800, color: C.mauve, maxW: 240 });
+function sSteps(t) {
+  let cur = 0; STEPS.forEach((s, i) => { if (t >= s[2] - 0.12) cur = i; });
+  // each step's colour panel slides in from the right over the previous (RTL wipe)
+  for (let i = 0; i <= cur; i++) {
+    const [ar, en, ti, items, bgc] = STEPS[i], d = t - (ti - 0.12), slide = i === 0 ? 1 : expo(d / 0.42);
+    const x0 = (1 - slide) * W; if (i < cur - 1) continue;
+    g.save(); g.beginPath(); g.rect(x0, 0, W, H); g.clip();
+    g.fillStyle = bgc; g.fillRect(0, 0, W, H);
+    const par = (1 - slide) * 260;                                  // inner parallax: content travels a little further
+    // giant outline numeral
+    g.save(); g.font = 'italic 500 520px "Playfair Display"'; g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.strokeStyle = 'rgba(169,139,181,.55)'; g.lineWidth = 3;
+    g.strokeText('0' + (i + 1), 70 + x0 * 0.4 + par * 0.3, 760); g.restore();
+    // product(s)
+    items.forEach(([key, dx, dy, h, rot], j) => { const k = SOFT(d - 0.05 - j * 0.07); product(key, 560 + dx + x0 + par + (1 - k) * 120, 1060 + dy + Math.sin(t * 1.4 + j) * 8, h * (0.92 + 0.08 * k), { rot: rot + Math.sin(t * 0.9 + j) * 0.015, alpha: clamp(k * 2) }); });
+    // step name (Arabic big, Latin eyebrow)
+    const nk = (d - 0.06) / 0.35;
+    text(en, 1000 + x0 + par * 0.6, 300, { size: 26, weight: 600, family: 'Montserrat', color: C.pink, align: 'right', spacing: 10, alpha: clamp(nk * 2) });
+    g.save(); g.beginPath(); g.rect(x0, 330, W, 230); g.clip(); text(ar, 1000 + x0 + par * 0.8, 440 + (1 - easeOut(nk)) * 120, { size: 190, weight: 900, color: C.mauve, align: 'right' }); g.restore();
     g.restore();
-    if (on) drawSpr(hand(), x + 60, y + 250 + Math.sin(t * 8) * 6, 6, 0.2, 0.05);
-  });
-  wordLine(t, [['ولو', 20.65], ['تبين', 20.9], ['تبدين', 21.2], ['من', 21.45], ['الصفر', 21.55]], W / 2, 1420, 3.8, { size: 22, color: C.ivory, shadow: C.pink, shadowOff: 2 });
-  drawT(ptext('ALL PLAYERS ✓', { size: 9, weight: 400, family: 'Press Start 2P', color: C.lavL }), 540, 1600, 3.6, { sc: sp(t - 21.6, SNAPPY) });
-}
-
-// -------- S6 22.4–29.6 ending: COLLECTION COMPLETE, the full open bag on a glowing pedestal --------
-function sEnd(t) {
-  space(t, C.mauveDD); rays(540, 760, 1300, t, 0.3 * clamp((t - 22.4) * 3));
-  drawT(ptext('COLLECTION COMPLETE', { size: 10, weight: 400, family: 'Press Start 2P', color: '#F7C948', outline: C.ink }), 540, 250, 4.2, { sc: sp(t - 22.45, SNAPPY) });
-  counter(57, 540, 350, 4.2, sp(t - 22.6, PLAYFUL));
-  g.fillStyle = C.ink; g.beginPath(); g.ellipse(540, 1060, 330, 70, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = C.mauve; g.beginPath(); g.ellipse(540, 1050, 320, 62, 0, 0, Math.PI * 2); g.fill();
-  const bk = sp(t - 22.55, [150, 15]); photo('bago', 540, 790 + Math.sin(t * 2) * 8, 520 * bk);
-  for (let i = 0; i < 6; i++) { const a = t * 1.5 + i * Math.PI / 3; drawSpr(sparkle(i % 2 ? C.pink : '#F7C948'), 540 + Math.cos(a) * 360, 790 + Math.sin(a) * 300, 6 * clamp((t - 22.8) * 3)); }
-  const nk = sp(t - 22.9, SNAPPY); if (nk > 0) text('شنطة بيوتي ارتست المتكاملة', 540, 1180 + (1 - nk) * 30, { size: 62, weight: 900, color: C.ivory, alpha: clamp(nk * 3), maxW: 960 });
-  const lk = sp(t - 24.3, HEAVY); if (lk > 0) { const L = IMG.logoW, w = 420 * (0.85 + 0.15 * lk), h = w * L.height / L.width; g.save(); g.globalAlpha = clamp(lk * 3); g.drawImage(L, 540 - w / 2, 1300 - h / 2, w, h); g.restore(); }
-  { const words = [['صُنع', 25.06], ['ليعتني', 25.54], ['بجمالك', 26.1]], gap = 20;
-    g.save(); g.font = '800 58px "Cairo"'; const ws = words.map(([w]) => g.measureText(w).width); g.restore();
-    let x = 540 + (ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1)) / 2;
-    words.forEach(([w, ti], i) => { const k = sp(t - ti, SNAPPY); if (k > 0) text(w, x - ws[i] / 2, 1410 + (1 - k) * 30, { size: 58, color: C.lavL, alpha: clamp(k * 3) }); x -= ws[i] + gap; }); }
-  const bt = sp(t - 27.0, SNAPPY), press = t > 27.9 ? 1 - 0.07 * Math.exp(-(t - 27.9) * 10) * Math.sin(Math.min(Math.PI, (t - 27.9) * 18)) : 1;
-  if (bt > 0) { g.save(); g.translate(540, 1580); g.scale(bt * press, bt * press); pill(0, 0, 680, 130, C.pink); text('اطلبيها من karaduo.com', 0, -4, { size: 46, weight: 800 }); g.restore(); }
-  const uk = sp(t - 27.25, DEFAULT); if (uk > 0) { g.save(); g.globalAlpha = clamp(uk * 2); drawT(ptext('البكجات ← شنطة بيوتي ارتست المتكاملة', { size: 13, color: C.lavL }), 540, 1710, 3, {}); g.restore(); }
-  if (t > 27.4) { const mk = easeOut((t - 27.4) / 0.45); drawSpr(hand(), lerp(1000, 780, mk), lerp(1850, 1592, mk), 7, 0.2, 0.05); }
-  if (t > 27.92 && t < 28.4) { const d = t - 27.92; g.strokeStyle = C.ivory; g.lineWidth = 8 * (1 - d / 0.48); g.beginPath(); g.arc(797, 1597, 30 + d * 260, 0, Math.PI * 2); g.stroke(); }
-}
-
-const SCENES = [[0, 3.6, sOpen], [3.6, 6.3, sFill], [6.3, 13.9, sCats], [13.9, 18.3, sBag], [18.3, 22.4, sWho], [22.4, 29.61, sEnd]];
-const WIPES = [[6.3, C.lav], [13.9, C.mauveDD], [18.3, C.pink], [22.4, C.lavL]];
-
-function draw(t) {
-  g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = true;
-  const [sx, sy] = shake(t);
-  g.save(); g.translate(sx, sy);
-  for (const [a, b, fn] of SCENES) if (t >= a && t < b) fn(t);
-  drawHost(t);
+  }
+  // progress rail (8 steps)
+  const pk = clamp((t - 4.95) * 3);
+  g.save(); g.globalAlpha = pk;
+  for (let i = 0; i < 8; i++) { const x = 960 - i * 120, on = i <= cur; g.fillStyle = on ? C.pink : 'rgba(169,139,181,.45)'; g.beginPath(); g.roundRect(x - 44, 1720, 88, 8, 4); g.fill(); }
+  text(`${AR(cur + 1)} / ${AR(8)}`, 540, 1790, { size: 34, weight: 700, color: C.lavD });
   g.restore();
-  for (const [tc, col] of WIPES) blockWipe(t, tc, col);
 }
 
-window.__ready = false;
-window.seek = (t) => { draw(t); return true; };
+// ================= S3 57 pieces → one bag 11.9–15.8 =================
+const ALL = ['primer', 'cn1', 'contour', 'flora', 'liqblush', 'pro12', 'mascara', 'brow', 'halo', 'starx', 'glowcrush', 'radrouge', 'vibeout', 'spray', 'loose', 'blur', 'es25', 'aloha'];
+function sCount(t) {
+  stage(t, 1);
+  const n = Math.round(expo((t - 12.3) / 1.4) * 57);
+  // products orbit, then get pulled into the bag on "في شنطة وحدة"
+  const pull = easeInOut((t - 14.45) / 0.7);
+  ALL.forEach((key, i) => { const a = i / ALL.length * Math.PI * 2 + t * 0.35, rx = 440, ry = 700;
+    const x = lerp(540 + Math.cos(a) * rx, 540, pull), y = lerp(1000 + Math.sin(a) * ry, 1210, pull), h = lerp(170 + (i % 3) * 30, 20, pull);
+    const k = SOFT(t - 11.95 - i * 0.04); product(key, x, y, h * k, { shadow: false, alpha: clamp(k * 2) * (1 - clamp((t - 14.65) / 0.3)) }); });
+  { const gl = g.createRadialGradient(540, 1000, 0, 540, 1000, 420); gl.addColorStop(0, 'rgba(250,247,248,.95)'); gl.addColorStop(0.7, 'rgba(250,247,248,.8)'); gl.addColorStop(1, 'rgba(250,247,248,0)'); g.save(); g.globalAlpha = 1 - clamp((t - 14.3) / 0.35); g.fillStyle = gl; g.fillRect(0, 500, W, 1000); g.restore(); }
+  // the number
+  g.save(); g.globalAlpha = 1 - clamp((t - 14.3) / 0.35);
+  text(AR(n), 540, 900, { size: 420, weight: 700, family: 'Playfair Display', color: C.mauve });
+  revealText('قطعة من كارا دو', 540, 1180, (t - 13.0) / 0.45, { size: 74, weight: 800, color: C.pink });
+  g.restore();
+  // the closed bag rises
+  const bk = SILK(t - 14.3); if (bk > 0) product('bagc', 540, 1060 + (1 - bk) * 500, 700 * (0.85 + 0.15 * bk), { alpha: clamp(bk * 2) });
+  revealText('في شنطة وحدة', 540, 420, (t - 14.5) / 0.45, { size: 96, weight: 900, color: C.mauve });
+  if (t > 15.2) sweep(t, 15.15, 0.7, 0.6);
+}
+
+// ================= S4 features on the open bag 15.8–21.4 =================
+function callout(t, ti, ax, ay, lx, ly, ar, en, align) {
+  const k = (t - ti) / 0.45; if (k <= 0) return;
+  g.save(); g.fillStyle = C.pink; g.beginPath(); g.arc(ax, ay, 14 * POP(t - ti), 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(221,78,148,.35)'; g.lineWidth = 3; g.beginPath(); g.arc(ax, ay, 14 + 26 * ((t * 1.2) % 1), 0, Math.PI * 2); g.stroke(); g.restore();
+  hairline(ax, ay, lx, ly, k, C.pink, 3);
+  const tk = (t - ti - 0.25) / 0.45;
+  revealText(ar, lx + (align === 'right' ? 0 : 0), ly - 40, tk, { size: 56, weight: 800, color: C.mauve, align });
+  text(en, lx, ly + 22, { size: 22, weight: 600, family: 'Montserrat', color: C.lavD, align, spacing: 6, alpha: clamp(tk * 2) });
+}
+function sBag(t) {
+  stage(t);
+  const ok = SILK(t - 15.8); product('bago', 560, 900 + (1 - ok) * 80, 860 * (0.94 + 0.06 * ok), { alpha: clamp(ok * 2) });
+  sweep(t, 16.0, 0.9, 0.55);
+  text('THE BEAUTY ARTIST BAG', 540, 260, { size: 26, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 10, alpha: clamp((t - 15.9) * 2) });
+  callout(t, 16.04, 420, 1090, 990, 1440, 'فواصل تترتب على كيفك', 'REARRANGEABLE DIVIDERS', 'right');
+  callout(t, 18.15, 830, 820, 990, 1600, '٤ شنط شفافة', '4 DETACHABLE CLEAR POUCHES', 'right');
+  // wheel macro in a circle
+  const wk = SOFT(t - 19.66);
+  if (wk > 0) { g.save(); g.translate(250, 1560); g.scale(wk, wk); g.shadowColor = 'rgba(101,74,112,.3)'; g.shadowBlur = 40; g.fillStyle = C.ivory; g.beginPath(); g.arc(0, 0, 170, 0, Math.PI * 2); g.fill(); g.shadowColor = 'transparent';
+    g.beginPath(); g.arc(0, 0, 160, 0, Math.PI * 2); g.clip(); const im = IMG.wheel; g.drawImage(im, -170, -200, 340, 340 * im.height / im.width); g.restore();
+    g.save(); g.strokeStyle = C.pinkL; g.lineWidth = 4; g.setLineDash([10, 14]); g.translate(250, 1560); g.rotate(t * 1.5); g.beginPath(); g.arc(0, 0, 192 * wk, 0, Math.PI * 2); g.stroke(); g.restore();
+    revealText('وعجلات تمشي معك', 990, 1760, (t - 19.9) / 0.45, { size: 56, weight: 800, color: C.mauve, align: 'right' }); }
+}
+
+// ================= S5 ending 21.4–29.6 =================
+function sEnd(t) {
+  stage(t);
+  // pedestal + closed bag
+  const bk = SILK(t - 21.45);
+  g.save(); g.globalAlpha = clamp(bk * 2); const pg = g.createRadialGradient(540, 1040, 0, 540, 1040, 380); pg.addColorStop(0, 'rgba(208,185,217,.55)'); pg.addColorStop(1, 'rgba(208,185,217,0)'); g.fillStyle = pg; g.beginPath(); g.ellipse(540, 1040, 380, 70, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  product('bagc', 540, 760 + (1 - bk) * 90 + Math.sin(t * 1.2) * 6, 560 * (0.9 + 0.1 * bk), { alpha: clamp(bk * 2) });
+  sweep(t, 22.3, 1.0, 0.65);
+  for (let i = 0; i < 6; i++) { const a = t * 0.6 + i * Math.PI / 3; sparkle(540 + Math.cos(a) * 380, 760 + Math.sin(a) * 300, 14 * clamp((t - 22) * 2) * (0.6 + 0.4 * Math.sin(t * 3 + i)), i % 2 ? C.pinkL : C.lavD, 0.8); }
+  // title, word by word
+  revealText('شنطة بيوتي ارتست', 540, 1180, (t - 21.84) / 0.5, { size: 84, weight: 900, color: C.mauve });
+  revealText('المتكاملة', 540, 1290, (t - 23.15) / 0.45, { size: 84, weight: 900, color: C.pink });
+  text('57 PIECES  ·  ONE BAG', 540, 1385, { size: 24, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 8, alpha: clamp((t - 23.5) * 2) });
+  // logo + slogan
+  const lk = SOFT(t - 24.05); logo(540, 1490, 380 * (0.9 + 0.1 * lk), 'M', clamp(lk * 2));
+  revealText('صُنع ليعتني بجمالك', 540, 1585, (t - 24.3) / 0.6, { size: 54, weight: 700, color: C.mauveD });
+  // CTA
+  const ck = POP(t - 26.6), press = t > 27.6 ? 1 - 0.05 * Math.sin(clamp((t - 27.6) / 0.3) * Math.PI) : 1;
+  if (ck > 0) { g.save(); g.translate(540, 1720); g.scale(ck * press, ck * press); pill(0, 0, 700, 120, C.pink); text('اطلبيها من karaduo.com', 0, -2, { size: 46, weight: 800, color: '#fff' }); g.restore(); }
+  text('البكجات  ←  شنطة بيوتي ارتست المتكاملة', 540, 1825, { size: 30, weight: 600, family: 'Tajawal', color: C.lavD, alpha: clamp((t - 26.9) * 2) });
+  if (t > 27.6 && t < 28.2) { const d = (t - 27.6) / 0.6; g.strokeStyle = `rgba(221,78,148,${1 - d})`; g.lineWidth = 6; g.beginPath(); g.roundRect(540 - 350 - d * 40, 1660 - d * 40, 700 + d * 80, 120 + d * 80, 60 + d * 40); g.stroke(); }
+}
+
+// ---------- transitions ----------
+function veil(t, tc, dur = 0.5, col = C.ivory) { const d = 1 - Math.abs((t - tc) / (dur / 2)); if (d <= 0) return; g.save(); g.globalAlpha = easeInOut(d); g.fillStyle = col; g.fillRect(0, 0, W, H); g.restore(); }
+
+const SCENES = [[0, 4.95, sOpen], [4.95, 11.9, sSteps], [11.9, 15.8, sCount], [15.8, 21.4, sBag], [21.4, 29.61, sEnd]];
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
+  for (const [a, b, fn] of SCENES) if (t >= a && t < b) fn(t);
+  veil(t, 11.9, 0.45); veil(t, 15.8, 0.5); veil(t, 21.4, 0.55);
+  grain(t);
+  // very soft vignette
+  const v = g.createRadialGradient(540, 960, 600, 540, 960, 1250); v.addColorStop(0, 'rgba(101,74,112,0)'); v.addColorStop(1, 'rgba(101,74,112,.12)'); g.fillStyle = v; g.fillRect(0, 0, W, H);
+}
+window.__ready = false; window.seek = (t) => { draw(t); return true; };
 (async () => {
-  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('bagc', 'assets/bagc.png'), loadImg('bago', 'assets/bago.png'), loadImg('wheel', 'assets/wheel.png'),
-    ...PRODS.map((id) => loadImg(id, `assets/prod/${id}.png`)), loadImg('tube_gold', 'assets/prod/tube_gold.png'),
-    loadImg('av_bust', 'assets/avatar/bust.png'), ...FACES5.map((f) => loadImg('av_face_' + f, `assets/avatar/face_${f}.png`))]);
-  IMG.logoW = tint(IMG.logo, C.ivory);
-  await Promise.all(['900 20px Cairo', '800 20px Cairo', '700 20px Cairo', '20px "Press Start 2P"', '500 20px Montserrat', '600 20px Montserrat', '700 20px Montserrat'].map((f) => document.fonts.load(f, 'abcأب٠')));
-  await document.fonts.ready;
-  window.__ready = true; draw(0);
+  const ED = ['primer', 'cn1', 'contour', 'flora', 'liqblush', 'pro12', 'mascara', 'brow', 'halo', 'starx', 'glowcrush', 'radrouge', 'vibeout', 'spray', 'loose', 'blur', 'es25', 'aloha', 'bagc', 'bago'];
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('wheel', 'assets/wheel.png'), ...ED.map((k) => loadImg(k, `assets/ed/${k}.jpg`))]);
+  IMG.logoM = tint(IMG.logo, C.mauve); IMG.logoW = tint(IMG.logo, C.ivory);
+  await Promise.all(['900 40px Cairo', '800 40px Cairo', '700 40px Cairo', '600 40px Cairo', '600 40px Tajawal', '600 40px Montserrat', '700 40px "Playfair Display"', 'italic 500 40px "Playfair Display"'].map((f) => document.fonts.load(f, 'abcأب٠57')));
+  await document.fonts.ready; window.__ready = true; draw(0);
   if (!navigator.webdriver) { const t0 = performance.now(); (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })(); }
 })();
 </script>

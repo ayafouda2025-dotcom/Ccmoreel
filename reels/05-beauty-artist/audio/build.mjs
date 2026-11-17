@@ -1,112 +1,63 @@
-// node audio/build.mjs   (run from the reel folder)
-// -> audio/vo.wav (placed voice lines), audio/music.wav (120 BPM chiptune), audio/sfx.wav, env.js (mouth envelope), out/mix.wav
-import { readFileSync, writeFileSync } from 'node:fs';
+// node audio/build.mjs long|short -> out/mix_<v>.wav  (soft synthesized music + Nouf VO (long only) + light SFX, -14 LUFS)
+import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+const V = process.argv[2] || 'long', SR = 48000;
+const DUR = 29.6, N = Math.ceil(DUR * SR);
+const ff = (a, input) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...a], { input, maxBuffer: 1 << 30 });
 
-const TL = JSON.parse(readFileSync('timeline.json', 'utf8'));
-const SR = 48000, DUR = TL.dur, N = Math.ceil(DUR * SR);
-const ff = (args, input) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args], { input, maxBuffer: 1 << 30 });
-
-// ---------- 1. voice: cut each line and place it on the timeline ----------
-{
-  const srcs = [...new Set(TL.vo_segments.map((sg) => sg[3] || TL.vo_src))];
-  const parts = TL.vo_segments.map(([s, e, d, src], i) =>
-    `[${srcs.indexOf(src || TL.vo_src)}:a]aresample=${SR},atrim=${s}:${e},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,afade=t=out:st=${(e - s - 0.06).toFixed(3)}:d=0.06,adelay=${Math.round(d * 1000)}:all=1[v${i}]`);
-  const mix = TL.vo_segments.map((_, i) => `[v${i}]`).join('') + `amix=inputs=${TL.vo_segments.length}:normalize=0,apad=whole_dur=${DUR},atrim=0:${DUR}[vo]`;
-  ff([...srcs.flatMap((f) => ['-i', f]), '-filter_complex', parts.join(';') + ';' + mix, '-map', '[vo]', '-ar', SR, '-ac', '1', 'audio/vo.wav']);
-}
-
-// ---------- 2. mouth envelope for lip flap (60 per second) ----------
-{
-  const raw = ff(['-i', 'audio/vo.wav', '-f', 'f32le', '-ac', '1', '-ar', SR, '-']);
-  const x = new Float32Array(raw.buffer, raw.byteOffset, raw.length / 4);
-  const hop = SR / 60, env = [];
-  for (let i = 0; i * hop < x.length; i++) {
-    let s = 0; const a = Math.floor(i * hop), b = Math.min(x.length, Math.floor((i + 1) * hop));
-    for (let j = a; j < b; j++) s += x[j] * x[j];
-    env.push(+Math.sqrt(s / Math.max(1, b - a)).toFixed(4));
-  }
-  const peak = Math.max(...env);
-  writeFileSync('env.js', `window.VO_ENV=${JSON.stringify(env.map((v) => +(v / peak).toFixed(3)))};\n`);
-}
-
-// ---------- shared synth helpers (deterministic) ----------
-let seed = 1234567;
-const noise = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2147483648 - 1);
-const sq = (ph, duty = 0.5) => ((ph % 1) < duty ? 1 : -1);
-const tri = (ph) => 1 - 4 * Math.abs((ph % 1) - 0.5);
+// VO lines: [src_start, src_end, dst_start] in audio/vo_a.mp3
+const VO = [[0.0, 3.95, 0.6], [4.3, 11.0, 5.0], [11.1, 14.45, 12.2], [14.6, 19.75, 15.9], [19.9, 24.72, 21.6]];
+const SFX = [[0.1, 'chime'], [3.4, 'swish'], [3.6, 'sparkle'], [4.95, 'swish'], [5.0, 'tap'], [5.86, 'tap'], [6.74, 'tap'], [7.61, 'tap'], [8.39, 'tap'], [9.18, 'tap'], [9.92, 'tap'], [10.88, 'tap'],
+  [11.9, 'swish'], [12.3, 'tick'], [13.7, 'coin'], [14.45, 'swish'], [14.9, 'pop'], [15.15, 'sparkle'], [15.8, 'swish'], [16.04, 'pop'], [18.15, 'pop'], [19.66, 'pop'],
+  [21.4, 'swish'], [21.6, 'chime'], [22.3, 'sparkle'], [24.05, 'sparkle'], [26.6, 'pop'], [27.6, 'tap'], [27.65, 'sparkle']];
+let seed = 7; const noise = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2147483648 - 1);
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
-function add(buf, start, len, fn) {
-  const s0 = Math.floor(start * SR);
-  for (let i = 0; i < len * SR; i++) { const k = s0 + i; if (k >= 0 && k < buf.length) buf[k] += fn(i / SR); }
-}
-function writeWav(path, chans) {
-  const n = chans[0].length, c = chans.length, b = Buffer.alloc(44 + n * 2 * c);
-  b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2 * c, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16);
-  b.writeUInt16LE(1, 20); b.writeUInt16LE(c, 22); b.writeUInt32LE(SR, 24); b.writeUInt32LE(SR * 2 * c, 28);
-  b.writeUInt16LE(2 * c, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2 * c, 40);
-  for (let i = 0; i < n; i++) for (let ch = 0; ch < c; ch++)
-    b.writeInt16LE(Math.round(Math.max(-1, Math.min(1, chans[ch][i])) * 32767), 44 + (i * c + ch) * 2);
-  writeFileSync(path, b);
-}
+const add = (b, s, len, fn) => { const s0 = Math.floor(s * SR); for (let i = 0; i < len * SR; i++) { const k = s0 + i; if (k >= 0 && k < b.length) b[k] += fn(i / SR); } };
+function wav(path, ch) { const n = ch[0].length, c = ch.length, b = Buffer.alloc(44 + n * 2 * c);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2 * c, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(c, 22);
+  b.writeUInt32LE(SR, 24); b.writeUInt32LE(SR * 2 * c, 28); b.writeUInt16LE(2 * c, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2 * c, 40);
+  for (let i = 0; i < n; i++) for (let k = 0; k < c; k++) b.writeInt16LE(Math.round(Math.max(-1, Math.min(1, ch[k][i])) * 32767), 44 + (i * c + k) * 2); writeFileSync(path, b); }
 
-// ---------- 3. music: soft chiptune, 120 BPM, Fmaj7 - Em7 - Dm7 - Cmaj7 ----------
+// ---------- soft pop music, 100 BPM: Fmaj7 – Am7 – Dm7 – Bbmaj7 ----------
 {
-  const M = new Float32Array(N), L = new Float32Array(N), R = new Float32Array(N), beat = 60 / TL.bpm;
-  const chords = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [48, 52, 55, 59]];
-  const END = TL.dur - 4.8;                                   // band stops at the lockup, then a chime
+  const L = new Float32Array(N), R = new Float32Array(N), beat = 60 / 84, END = DUR - 2.4;
+  const CH = [[52, 55, 59, 62], [48, 52, 55, 59], [53, 57, 60, 64], [50, 53, 57, 62]];
+  const pluck = (f, a) => (x) => (Math.sin(2 * Math.PI * f * x) + 0.35 * Math.sin(4 * Math.PI * f * x) * Math.exp(-x * 9)) * Math.exp(-x * 5.5) * a;
   for (let b = 0; b * beat < END; b++) {
-    const t = b * beat, bar = Math.floor(b / 4), ch = chords[bar % 4], intro = t < 1.8;
-    // kick on 1 and 3, snare on 2 and 4
-    if (!intro || b % 4 === 0) add(M, t, 0.3, (x) => Math.sin(2 * Math.PI * (55 + 90 * Math.exp(-x * 30)) * x) * Math.exp(-x * 11) * (b % 2 === 0 ? 0.55 : 0));
-    if (!intro && b % 2 === 1) add(M, t, 0.18, (x) => noise() * Math.exp(-x * 22) * 0.22);
-    // hats on 8ths
-    if (!intro) for (const h of [0, 0.5]) add(M, t + h * beat, 0.04, (x) => noise() * Math.exp(-x * 120) * 0.08);
-    // bass: root on 8ths, triangle
-    const root = ch[0] - 12;
-    for (const h of [0, 0.5]) add(M, t + h * beat, beat * 0.45, (x) => tri(mtof(root + (h ? 12 : 0)) * x) * Math.min(1, x * 200) * Math.exp(-x * 4) * 0.22);
-    // arp: 16ths, 25% pulse, panned
-    if (!intro) for (let s = 0; s < 4; s++) {
-      const note = ch[(b * 4 + s) % 4] + 12, pan = s % 2 ? 0.7 : 0.3;
-      add(R, t + s * beat / 4, beat / 4 * 0.9, (x) => sq(mtof(note) * x, 0.25) * Math.exp(-x * 14) * 0.05 * pan * 2);
-      add(L, t + s * beat / 4, beat / 4 * 0.9, (x) => sq(mtof(note) * x, 0.25) * Math.exp(-x * 14) * 0.05 * (1 - pan) * 2);
-    }
+    const t = b * beat, ch = CH[Math.floor(b / 4) % 4];
+    if (b % 4 === 0) ch.forEach((m, i) => { const f = mtof(m); add(L, t, beat * 4, (x) => Math.sin(2 * Math.PI * f * 0.999 * x) * Math.min(1, x * 3) * Math.min(1, (beat * 4 - x) * 3) * 0.022); add(R, t, beat * 4, (x) => Math.sin(2 * Math.PI * f * 1.001 * x) * Math.min(1, x * 3) * Math.min(1, (beat * 4 - x) * 3) * 0.022); });
+    add(L, t, beat, (x) => Math.sin(2 * Math.PI * mtof(ch[0] - 12) * x) * Math.min(1, x * 80) * Math.exp(-x * 3) * 0.16); add(R, t, beat, (x) => Math.sin(2 * Math.PI * mtof(ch[0] - 12) * x) * Math.min(1, x * 80) * Math.exp(-x * 3) * 0.16);
+    if (b % 2 === 0) { const k = (x) => Math.sin(2 * Math.PI * (50 + 80 * Math.exp(-x * 35)) * x) * Math.exp(-x * 10) * 0.42; add(L, t, 0.3, k); add(R, t, 0.3, k); }
+    if (b % 4 === 1 || b % 4 === 3) { const c = (x) => noise() * Math.exp(-x * 26) * 0.12; add(L, t, 0.15, c); add(R, t, 0.15, c); }
+    for (const h of [0.5]) { const s = (x) => noise() * Math.exp(-x * 90) * 0.05; add(L, t + h * beat, 0.05, s); add(R, t + h * beat, 0.05, s); }
+    for (let s = 0; s < 2; s++) { const m = ch[(b * 2 + s) % 4] + 12, pan = s ? 0.7 : 0.3; add(L, t + s * beat / 2, 0.6, pluck(mtof(m), 0.06 * (1 - pan) * 2)); add(R, t + s * beat / 2, 0.6, pluck(mtof(m), 0.06 * pan * 2)); }
   }
-  // drop: one bright chime + warm pad under the lockup
-  [72, 76, 79, 84].forEach((m, i) => add(M, END + i * 0.06, 2.5, (x) => sq(mtof(m) * x, 0.5) * Math.exp(-x * 2.2) * 0.025));
-  [53, 57, 60, 64].forEach((m) => add(M, END + 0.2, DUR - END, (x) => tri(mtof(m) * x) * Math.min(1, x * 1.5) * Math.min(1, (DUR - END - 0.2 - x) * 1.2) * 0.03));
-  for (let i = 0; i < N; i++) { L[i] += M[i]; R[i] += M[i]; }
-  writeWav('audio/music.wav', [L, R]);
+  [65, 69, 72, 76, 79].forEach((m, i) => { add(L, END + i * 0.07, 2.6, pluck(mtof(m), 0.07)); add(R, END + i * 0.07, 2.6, pluck(mtof(m), 0.07)); });
+  wav('audio/music.wav', [L, R]);
 }
-
-// ---------- 4. sfx ----------
+// ---------- SFX ----------
 {
   const B = new Float32Array(N);
-  const V = {
-    blip:   [0.09, (x) => sq((880 + (x < 0.04 ? 0 : 440)) * x) * Math.exp(-x * 30) * 0.18],
-    pop:    [0.12, (x) => Math.sin(2 * Math.PI * (500 + 1400 * x) * x) * Math.exp(-x * 32) * 0.45],
-    thump:  [0.45, (x) => Math.sin(2 * Math.PI * (95 - 55 * x) * x) * Math.exp(-x * 9) * 0.8],
-    whoosh: [0.32, (x) => noise() * Math.sin(Math.PI * Math.min(1, x / 0.32)) * 0.22],
-    click:  [0.05, (x) => Math.sin(2 * Math.PI * 1900 * x) * Math.exp(-x * 90) * 0.35],
-    type:   [0.04, (x) => (noise() * 0.5 + Math.sin(2 * Math.PI * 2600 * x)) * Math.exp(-x * 140) * 0.22],
-    tick:   [0.06, (x) => sq(1320 * x) * Math.exp(-x * 60) * 0.12],
-    coin:   [0.35, (x) => sq((x < 0.07 ? 988 : 1319) * x) * Math.exp(-x * 7) * 0.14],
-    star:   [0.2, (x) => sq(1568 * x * (1 + x)) * Math.exp(-x * 16) * 0.13],
-    sparkle:[0.5, (x) => [2093, 2637, 3136].reduce((s, f, i) => s + (x > i * 0.05 ? Math.sin(2 * Math.PI * f * x) * Math.exp(-(x - i * 0.05) * 9) : 0), 0) * 0.08],
-    jingle: [0.6, (x) => { const n = [72, 76, 79, 84][Math.min(3, Math.floor(x / 0.09))]; return sq(mtof(n) * x, 0.25) * Math.exp(-(x % 0.09) * 8) * 0.12; }],
-    burst:  [0.4, (x) => (noise() * Math.exp(-x * 10) * 0.35 + Math.sin(2 * Math.PI * 70 * x) * Math.exp(-x * 12) * 0.5)],
-    vs:     [0.7, (x) => (sq(mtof(64 - 12 * Math.min(1, x * 2.5)) * x) * 0.16 + noise() * 0.12) * Math.exp(-x * 3.5) + Math.sin(2 * Math.PI * (80 - 40 * x) * x) * Math.exp(-x * 7) * 0.6],
-    hit:    [0.3, (x) => (noise() * 0.6 + sq(110 * x) * 0.4) * Math.exp(-x * 14) * 0.6],
-    stamp:  [0.5, (x) => Math.sin(2 * Math.PI * (70 - 30 * x) * x) * Math.exp(-x * 10) * 0.9 + noise() * Math.exp(-x * 40) * 0.25],
+  const S = {
+    swish: [0.32, (x) => noise() * Math.sin(Math.PI * Math.min(1, x / 0.32)) * 0.12],
+    tap: [0.06, (x) => Math.sin(2 * Math.PI * 1500 * x) * Math.exp(-x * 80) * 0.25],
+    tick: [0.08, (x) => Math.sin(2 * Math.PI * 900 * x) * Math.exp(-x * 50) * 0.2],
+    pop: [0.12, (x) => Math.sin(2 * Math.PI * (500 + 1200 * x) * x) * Math.exp(-x * 30) * 0.3],
+    coin: [0.4, (x) => (Math.sin(2 * Math.PI * (x < 0.08 ? 1319 : 1760) * x)) * Math.exp(-x * 7) * 0.18],
+    sparkle: [0.6, (x) => [2093, 2637, 3136, 4186].reduce((s, f, i) => s + (x > i * 0.05 ? Math.sin(2 * Math.PI * f * x) * Math.exp(-(x - i * 0.05) * 8) : 0), 0) * 0.06],
+    chime: [1.2, (x) => [72, 76, 79, 84].reduce((s, m, i) => s + (x > i * 0.06 ? Math.sin(2 * Math.PI * mtof(m) * x) * Math.exp(-(x - i * 0.06) * 3) : 0), 0) * 0.08],
   };
-  for (const [t, type] of TL.sfx) { const [len, fn] = V[type]; add(B, t, len, fn); }
-  writeWav('audio/sfx.wav', [B]);
+  for (const [t, k] of SFX) { const [len, fn] = S[k]; add(B, t, len, fn); }
+  wav('audio/sfx.wav', [B]);
 }
-
-// ---------- 5. mix: music ducked under voice, loudness -14 LUFS ----------
-ff(['-i', 'audio/vo.wav', '-i', 'audio/music.wav', '-i', 'audio/sfx.wav', '-filter_complex',
-  '[0:a]asplit=2[vo][sc];[1:a]volume=0.30[mu];[mu][sc]sidechaincompress=threshold=0.02:ratio=10:attack=10:release=300[duck];' +
-  '[vo]volume=1.25,aformat=channel_layouts=stereo[v];[2:a]volume=0.65,aformat=channel_layouts=stereo[s];' +
-  '[v][duck][s]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]',
-  '-map', '[a]', '-ar', SR, 'out/mix.wav']);
-console.log('audio done: audio/vo.wav audio/music.wav audio/sfx.wav out/mix.wav env.js');
+// ---------- mix ----------
+if (VO.length) {
+  const parts = VO.map(([s, e, d], i) => `[0:a]aresample=${SR},atrim=${s}:${e},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,afade=t=out:st=${(e - s - 0.05).toFixed(3)}:d=0.05,adelay=${Math.round(d * 1000)}:all=1[v${i}]`);
+  ff(['-i', 'audio/vo2.mp3', '-filter_complex', parts.join(';') + ';' + VO.map((_, i) => `[v${i}]`).join('') + `amix=inputs=${VO.length}:normalize=0,apad=whole_dur=${DUR},atrim=0:${DUR}[vo]`, '-map', '[vo]', '-ar', SR, '-ac', '1', 'audio/vo.wav']);
+  ff(['-i', 'audio/vo.wav', '-i', 'audio/music.wav', '-i', 'audio/sfx.wav', '-filter_complex',
+    '[0:a]asplit=2[vo][sc];[1:a]volume=0.32[mu];[mu][sc]sidechaincompress=threshold=0.02:ratio=10:attack=10:release=300[duck];[vo]volume=1.3,aformat=channel_layouts=stereo[v];[2:a]volume=0.7,aformat=channel_layouts=stereo[s];[v][duck][s]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]',
+    '-map', '[a]', '-ar', SR, 'out/mix.wav']);
+} else {
+  ff(['-i', 'audio/music.wav', '-i', 'audio/sfx.wav', '-filter_complex', '[0:a]volume=0.9[m];[1:a]volume=0.8,aformat=channel_layouts=stereo[s];[m][s]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]', '-map', '[a]', '-ar', SR, `out/mix_${V}.wav`]);
+}
+console.log('audio ->', `out/mix_${V}.wav`);
