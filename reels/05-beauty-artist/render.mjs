@@ -13,7 +13,7 @@ const browser = await chromium.launch({ args: ['--allow-file-access-from-files']
 const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => console.error('PAGE ERROR', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.error('console:', m.text()); });
-await page.goto(pathToFileURL(resolve('index.html')).href);
+await page.goto(pathToFileURL(resolve(arg('page', 'index.html'))).href);
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 60000 });
 
 const shot = async (t, type = 'png') => { await page.evaluate((t) => window.seek(t), t); return page.locator('#c').screenshot({ type, ...(type === 'jpeg' ? { quality: 95 } : {}) }); };
@@ -28,7 +28,7 @@ if (arg('stills')) {
     'out/contact.png']);
   console.log('contact -> out/contact.png');
 } else {
-  const FPS = Number(arg('fps', 30)), from = Number(arg('from', 0)), to = Number(arg('to', 29.6));
+  const FPS = Number(arg('fps', 30)), from = Number(arg('from', 0)), to = Number(arg('to', 37.0));
   const out = arg('out', 'out/silent.mp4');
   const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '16', '-pix_fmt', 'yuv420p', '-r', String(FPS), out], { stdio: ['pipe', 'inherit', 'inherit'] });

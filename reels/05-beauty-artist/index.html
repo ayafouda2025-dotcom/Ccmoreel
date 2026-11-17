@@ -8,7 +8,7 @@
 // Kara Duo · Reel 05 "لوك كامل" — editorial luxury product film for the 57-piece Beauty Artist bag.
 // Light ivory/lavender stage, real product photos (white backgrounds dissolve via multiply), Playfair numerals, Cairo type.
 // Every frame is a pure function of t (window.seek).
-const W = 1080, H = 1920, DUR = 29.6;
+const W = 1080, H = 1920, DUR = 37.0;
 const g = document.getElementById('c').getContext('2d');
 const C = { ivory: '#FAF7F8', lav: '#D0B9D9', lavL: '#E7DAEC', lavLL: '#F3ECF6', lavD: '#A98BB5', mauve: '#654A70', mauveD: '#4F3859', ink: '#2B1C33', pink: '#DD4E94', pinkL: '#E98ABC', pinkLL: '#F8E1EE', blush: '#F6E7EF' };
 
@@ -40,6 +40,7 @@ function revealText(s, x, y, k, opt = {}) { if (k <= 0) return; const size = opt
 function product(key, cx, cy, h, { rot = 0, alpha = 1, shadow = true } = {}) {
   const im = IMG[key]; if (!im || h <= 0) return; const w = h * im.width / im.height;
   g.save(); g.translate(cx, cy); g.rotate(rot); g.globalAlpha *= alpha;
+  { const sg = g.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h) * 0.72); sg.addColorStop(0, 'rgba(255,255,255,.95)'); sg.addColorStop(0.6, 'rgba(255,255,255,.75)'); sg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = sg; g.beginPath(); g.arc(0, 0, Math.max(w, h) * 0.72, 0, Math.PI * 2); g.fill(); }
   if (shadow) { g.save(); g.globalAlpha *= 0.35; const gr = g.createRadialGradient(0, h * 0.5, 0, 0, h * 0.5, w * 0.6); gr.addColorStop(0, 'rgba(101,74,112,.55)'); gr.addColorStop(1, 'rgba(101,74,112,0)');
     g.fillStyle = gr; g.beginPath(); g.ellipse(0, h * 0.5, w * 0.6, h * 0.08, 0, 0, Math.PI * 2); g.fill(); g.restore(); }
   g.globalCompositeOperation = 'multiply'; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
@@ -52,11 +53,14 @@ function pill(cx, cy, w, h, fill) { g.save(); g.shadowColor = 'rgba(101,74,112,.
 function logo(cx, cy, w, col = 'M', a = 1) { const L = col === 'M' ? IMG.logoM : IMG.logoW; if (!L) return; const h = w * L.height / L.width; g.save(); g.globalAlpha *= a; g.drawImage(L, cx - w / 2, cy - h / 2, w, h); g.restore(); }
 
 // ---------- stage ----------
+function flower(x, y, r, a) { g.save(); g.globalAlpha *= a; g.translate(x, y); for (let k = 0; k < 4; k++) { g.rotate(Math.PI / 2); g.fillStyle = k % 2 ? C.pinkL : C.lavD; g.beginPath(); g.ellipse(r * 0.55, 0, r * 0.55, r * 0.3, 0, 0, Math.PI * 2); g.fill(); } g.fillStyle = C.pink; g.beginPath(); g.arc(0, 0, r * 0.16, 0, Math.PI * 2); g.fill(); g.restore(); }
 function stage(t, tone = 0) {
-  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, C.ivory); gr.addColorStop(1, tone ? '#EFE2F3' : '#F4EBF4'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  g.save(); g.filter = 'blur(90px)'; g.globalAlpha = 0.55;
-  [[200, 400, 260, C.pinkLL], [900, 1300, 320, C.lavL], [300, 1750, 280, C.lavLL]].forEach(([x, y, r, c], i) => { g.fillStyle = c; g.beginPath(); g.arc(x + Math.sin(t * 0.3 + i) * 50, y + Math.cos(t * 0.25 + i) * 40, r, 0, Math.PI * 2); g.fill(); });
+  const gr = g.createLinearGradient(0, 0, W * 0.3, H); gr.addColorStop(0, '#E9DCF0'); gr.addColorStop(0.45, tone ? '#F6DCE9' : '#F3E3EF'); gr.addColorStop(1, '#DCC7E6'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.save(); g.filter = 'blur(100px)'; g.globalAlpha = 0.75;
+  [[180, 380, 300, '#F4C6DD'], [940, 1250, 360, '#D7BEE6'], [260, 1760, 320, '#F2D2E6'], [900, 260, 220, '#FFFFFF']].forEach(([x, y, r, c], i) => { g.fillStyle = c; g.beginPath(); g.arc(x + Math.sin(t * 0.3 + i) * 60, y + Math.cos(t * 0.25 + i) * 50, r, 0, Math.PI * 2); g.fill(); });
   g.restore();
+  // khuzama watermark, drifting very slowly
+  const r = rng(77); for (let i = 0; i < 14; i++) { const x = r() * W, y = ((r() * H + t * 10) % (H + 200)) - 100, s = 26 + r() * 30; flower(x, y, s, 0.12); }
 }
 function grain(t) { const r = rng(Math.floor(t * 24) + 7); g.save(); g.globalAlpha = 0.05; for (let i = 0; i < 900; i++) { g.fillStyle = r() > 0.5 ? '#fff' : '#654A70'; g.fillRect(r() * W, r() * H, 2, 2); } g.restore(); }
 function sweep(t, t0, dur = 0.9, a = 0.55) { const d = (t - t0) / dur; if (d < 0 || d > 1) return; g.save(); g.globalCompositeOperation = 'screen'; g.translate(lerp(-500, W + 500, easeInOut(d)), H / 2); g.rotate(0.35);
@@ -71,7 +75,7 @@ function sOpen(t) {
   g.save(); g.globalAlpha = clamp(t * 3); g.translate(ax - (fx - 0.5) * w * lerp(1, 0, easeInOut((t - 0.1) / 4.3)), ay - (fy - 0.5) * h * lerp(1, 0, easeInOut((t - 0.1) / 4.3)));
   g.globalCompositeOperation = 'multiply'; g.imageSmoothingQuality = 'high'; g.drawImage(im, -w / 2, -h / 2, w, h); g.restore();
   // a soft ivory veil over the top for the type
-  const vg = g.createLinearGradient(0, 0, 0, 820); vg.addColorStop(0, 'rgba(250,247,248,.96)'); vg.addColorStop(1, 'rgba(250,247,248,0)'); g.fillStyle = vg; g.fillRect(0, 0, W, 820);
+  const vg = g.createLinearGradient(0, 0, 0, 820); vg.addColorStop(0, 'rgba(243,227,239,.97)'); vg.addColorStop(1, 'rgba(243,227,239,0)'); g.fillStyle = vg; g.fillRect(0, 0, W, 820);
   text('KARA DUO  ·  BEAUTY ARTIST', 540, 150, { size: 24, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 8, alpha: clamp((t - 0.3) * 2) });
   revealText('لوك كامل', 540, 310, (t - 1.0) / 0.45, { size: 170, weight: 900, color: C.mauve });
   hairline(340, 425, 740, 425, (t - 1.7) / 0.6, C.pinkL, 4);
@@ -82,14 +86,14 @@ function sOpen(t) {
 
 // ================= S2 the 8 steps 4.9–11.9 =================
 const STEPS = [
-  ['تحضير', 'PREP', 5.11, [['primer', 0, 0, 760, -0.06]], C.ivory],
-  ['تصحيح', 'CORRECT', 5.98, [['cn1', 0, 0, 380, 0.04]], '#F7EEF4'],
-  ['كونتور', 'CONTOUR', 6.86, [['contour', 0, 0, 700, -0.05]], '#F4ECE7'],
-  ['بلاشر', 'BLUSH', 7.73, [['flora', 60, -40, 500, 0.06], ['liqblush', -250, 90, 560, -0.1]], '#FBEAF1'],
-  ['عيون', 'EYES', 8.51, [['pro12', 40, -60, 560, -0.04], ['mascara', -300, 120, 640, 0.12], ['brow', 330, 160, 600, -0.18]], '#F1ECF6'],
-  ['إضاءة', 'GLOW', 9.30, [['halo', 160, -120, 400, 0.05], ['starx', -270, 40, 620, -0.08], ['glowcrush', 170, 260, 430, 0.04]], '#FBF3EA'],
-  ['شفايف', 'LIPS', 10.04, [['radrouge', 120, -40, 560, 0.04], ['vibeout', -290, 60, 700, -0.08]], '#FCE9EE'],
-  ['تثبيت', 'SET', 11.0, [['spray', -280, 0, 640, -0.04], ['loose', 150, -170, 420, 0.03], ['blur', 170, 250, 430, -0.03]], '#F2EEF7'],
+  ['تحضير', 'PREP', 5.11, [['primer', 0, 0, 760, -0.06]], '#EBDDF2'],
+  ['تصحيح', 'CORRECT', 5.98, [['cn1', 0, 0, 380, 0.04]], '#F7DCEA'],
+  ['كونتور', 'CONTOUR', 6.86, [['contour', 0, 0, 700, -0.05]], '#E6D5EE'],
+  ['بلاشر', 'BLUSH', 7.73, [['flora', 60, -40, 500, 0.06], ['liqblush', -250, 90, 560, -0.1]], '#F9D6E7'],
+  ['عيون', 'EYES', 8.51, [['pro12', 40, -60, 560, -0.04], ['mascara', -300, 120, 640, 0.12], ['brow', 330, 160, 600, -0.18]], '#E9DAF1'],
+  ['إضاءة', 'GLOW', 9.30, [['halo', 160, -120, 400, 0.05], ['starx', -270, 40, 620, -0.08], ['glowcrush', 170, 260, 430, 0.04]], '#F5E2EE'],
+  ['شفايف', 'LIPS', 10.04, [['radrouge', 120, -40, 560, 0.04], ['vibeout', -290, 60, 700, -0.08]], '#F8D2E3'],
+  ['تثبيت', 'SET', 11.0, [['spray', -280, 0, 640, -0.04], ['loose', 150, -170, 420, 0.03], ['blur', 170, 250, 430, -0.03]], '#E4D3EC'],
 ];
 function sSteps(t) {
   let cur = 0; STEPS.forEach((s, i) => { if (t >= s[2] - 0.12) cur = i; });
@@ -166,37 +170,66 @@ function sBag(t) {
     revealText('وعجلات تمشي معك', 990, 1760, (t - 19.9) / 0.45, { size: 56, weight: 800, color: C.mauve, align: 'right' }); }
 }
 
-// ================= S5 ending 21.4–29.6 =================
+// ================= S5 how to order 21.4–28.4 (real store screens, prices hidden) =================
+const OSTEPS = [['karaduo.com', 21.6], ['البكجات', 23.84], ['أضيفيها للسلة', 24.96], ['توصلك لين بابك', 26.38]];
+function phoneShot(cx, top, w, key, cropH) {
+  const im = IMG[key], s = w / im.width, h = 932 * 2 * s;
+  g.save(); g.shadowColor = 'rgba(101,74,112,.35)'; g.shadowBlur = 60; g.shadowOffsetY = 26; g.fillStyle = '#2E2135'; g.beginPath(); g.roundRect(cx - w / 2 - 18, top - 18, w + 36, h + 36, 64); g.fill(); g.restore();
+  g.save(); g.beginPath(); g.roundRect(cx - w / 2, top, w, h, 48); g.clip(); g.fillStyle = '#F3ECF6'; g.fillRect(cx - w / 2, top, w, h);
+  g.imageSmoothingQuality = 'high'; const sh = cropH || im.height; g.drawImage(im, 0, 0, im.width, sh, cx - w / 2, top, w, sh * s); g.restore();
+  return { x0: cx - w / 2, y0: top, s: s * 2 };                                     // s: canvas px per CSS px
+}
+function touch(x, y, t, ti) { const d = t - ti; if (d < -0.35 || d > 0.45) return; const p = d < 0 ? 0 : Math.sin(clamp(d / 0.25) * Math.PI);
+  g.save(); g.globalAlpha = clamp((d + 0.35) / 0.12) * clamp((0.45 - d) / 0.12); g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.arc(x, y, 34 + p * 10, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = C.pink; g.lineWidth = 5; g.stroke(); if (d > 0) { g.strokeStyle = `rgba(221,78,148,${1 - d / 0.45})`; g.beginPath(); g.arc(x, y, 40 + d * 200, 0, Math.PI * 2); g.stroke(); } g.restore(); }
+function sOrder(t) {
+  stage(t, 1);
+  text('HOW TO ORDER', 540, 200, { size: 26, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 10, alpha: clamp((t - 21.45) * 2) });
+  revealText('اطلبيها بخطوات بسيطة', 540, 290, (t - 21.5) / 0.5, { size: 70, weight: 900, color: C.mauve });
+  let key = 'o_home', crop = null; if (t >= 24.15 && t < 24.75) key = 'o_bundles'; else if (t >= 24.75 && t < 25.15) { key = 'o_product'; crop = 1600; } else if (t >= 25.15) key = 'o_add';
+  const pk = SILK(t - 21.45), ph = phoneShot(690 + (1 - pk) * 500, 420, 520, key, crop), X = (x) => ph.x0 + x * ph.s, Y = (y) => ph.y0 + y * ph.s;
+  if (key === 'o_home') touch(X(350), Y(625), t, 23.85);
+  if (key === 'o_bundles') touch(X(315), Y(300), t, 24.55);
+  if (key === 'o_add') touch(X(215), Y(465), t, 25.45);
+  if (t > 25.5) { const k = POP(t - 25.5); g.save(); g.translate(690, 640); g.scale(k, k); pill(0, 0, 430, 96, C.mauve); text('أُضيفت للسلة ✓', 0, -2, { size: 38, weight: 800, color: '#fff' }); g.restore(); }
+  // numbered steps on the left, editorial style
+  OSTEPS.forEach(([lab, ti], i) => { const on = t >= ti, k = SOFT(t - ti), y = 560 + i * 250;
+    g.save(); g.globalAlpha = on ? clamp(k * 2) : 0.35;
+    text('0' + (i + 1), 205, y - 40, { size: 110, weight: 500, family: 'Playfair Display', italic: true, color: on ? C.pink : C.lavD });
+    const latin = lab === 'karaduo.com'; text(lab, 205, y + 60, { size: latin ? 34 : 38, weight: latin ? 700 : 800, family: latin ? 'Montserrat' : 'Cairo', color: C.mauve, maxW: 330 });
+    if (i < 3) hairline(205, y + 100, 205, y + 150, on ? k : 0, C.lavD, 3);
+    g.restore(); });
+  const dk = POP(t - 26.4); if (dk > 0) { g.save(); g.translate(540, 1790); g.scale(dk, dk); pill(0, 0, 900, 110, C.pink); text('الرياض خلال يومين · الخليج خلال ٥ أيام', 0, -2, { size: 40, weight: 800, color: '#fff' }); g.restore(); }
+}
+
+// ================= S6 ending 28.4–37.0 =================
 function sEnd(t) {
   stage(t);
-  // pedestal + closed bag
-  const bk = SILK(t - 21.45);
-  g.save(); g.globalAlpha = clamp(bk * 2); const pg = g.createRadialGradient(540, 1040, 0, 540, 1040, 380); pg.addColorStop(0, 'rgba(208,185,217,.55)'); pg.addColorStop(1, 'rgba(208,185,217,0)'); g.fillStyle = pg; g.beginPath(); g.ellipse(540, 1040, 380, 70, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  const bk = SILK(t - 28.45);
+  g.save(); g.globalAlpha = clamp(bk * 2); const pg = g.createRadialGradient(540, 1040, 0, 540, 1040, 380); pg.addColorStop(0, 'rgba(255,255,255,.75)'); pg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = pg; g.beginPath(); g.ellipse(540, 1040, 380, 70, 0, 0, Math.PI * 2); g.fill(); g.restore();
   product('bagc', 540, 760 + (1 - bk) * 90 + Math.sin(t * 1.2) * 6, 560 * (0.9 + 0.1 * bk), { alpha: clamp(bk * 2) });
-  sweep(t, 22.3, 1.0, 0.65);
-  for (let i = 0; i < 6; i++) { const a = t * 0.6 + i * Math.PI / 3; sparkle(540 + Math.cos(a) * 380, 760 + Math.sin(a) * 300, 14 * clamp((t - 22) * 2) * (0.6 + 0.4 * Math.sin(t * 3 + i)), i % 2 ? C.pinkL : C.lavD, 0.8); }
-  // title, word by word
-  revealText('شنطة بيوتي ارتست', 540, 1180, (t - 21.84) / 0.5, { size: 84, weight: 900, color: C.mauve });
-  revealText('المتكاملة', 540, 1290, (t - 23.15) / 0.45, { size: 84, weight: 900, color: C.pink });
-  text('57 PIECES  ·  ONE BAG', 540, 1385, { size: 24, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 8, alpha: clamp((t - 23.5) * 2) });
-  // logo + slogan
-  const lk = SOFT(t - 24.05); logo(540, 1490, 380 * (0.9 + 0.1 * lk), 'M', clamp(lk * 2));
-  revealText('صُنع ليعتني بجمالك', 540, 1585, (t - 24.3) / 0.6, { size: 54, weight: 700, color: C.mauveD });
-  // CTA
-  const ck = POP(t - 26.6), press = t > 27.6 ? 1 - 0.05 * Math.sin(clamp((t - 27.6) / 0.3) * Math.PI) : 1;
-  if (ck > 0) { g.save(); g.translate(540, 1720); g.scale(ck * press, ck * press); pill(0, 0, 700, 120, C.pink); text('اطلبيها من karaduo.com', 0, -2, { size: 46, weight: 800, color: '#fff' }); g.restore(); }
-  text('البكجات  ←  شنطة بيوتي ارتست المتكاملة', 540, 1825, { size: 30, weight: 600, family: 'Tajawal', color: C.lavD, alpha: clamp((t - 26.9) * 2) });
-  if (t > 27.6 && t < 28.2) { const d = (t - 27.6) / 0.6; g.strokeStyle = `rgba(221,78,148,${1 - d})`; g.lineWidth = 6; g.beginPath(); g.roundRect(540 - 350 - d * 40, 1660 - d * 40, 700 + d * 80, 120 + d * 80, 60 + d * 40); g.stroke(); }
+  sweep(t, 29.3, 1.0, 0.65);
+  for (let i = 0; i < 6; i++) { const a = t * 0.6 + i * Math.PI / 3; sparkle(540 + Math.cos(a) * 380, 760 + Math.sin(a) * 300, 14 * clamp((t - 29) * 2) * (0.6 + 0.4 * Math.sin(t * 3 + i)), i % 2 ? C.pinkL : C.lavD, 0.8); }
+  revealText('شنطة بيوتي ارتست', 540, 1180, (t - 28.62) / 0.5, { size: 84, weight: 900, color: C.mauve });
+  revealText('المتكاملة', 540, 1290, (t - 29.9) / 0.45, { size: 84, weight: 900, color: C.pink });
+  text('57 PIECES  ·  ONE BAG', 540, 1385, { size: 24, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 8, alpha: clamp((t - 30.4) * 2) });
+  // "كارا دو" — the logo lands exactly on the word, then the slogan
+  const lk = POP(t - 31.7); logo(540, 1495, 420 * (0.85 + 0.15 * lk), 'M', clamp(lk * 2));
+  if (t > 31.7 && t < 32.6) sweep(t, 31.75, 0.8, 0.8);
+  revealText('صُنع ليعتني بجمالك', 540, 1595, (t - 32.88) / 0.6, { size: 56, weight: 700, color: C.mauveD });
+  const ck = POP(t - 35.0), press = t > 35.9 ? 1 - 0.05 * Math.sin(clamp((t - 35.9) / 0.3) * Math.PI) : 1;
+  if (ck > 0) { g.save(); g.translate(540, 1730); g.scale(ck * press, ck * press); pill(0, 0, 700, 120, C.pink); text('اطلبيها من karaduo.com', 0, -2, { size: 46, weight: 800, color: '#fff' }); g.restore(); }
+  text('البكجات  ←  شنطة بيوتي ارتست المتكاملة', 540, 1838, { size: 30, weight: 600, family: 'Tajawal', color: C.mauveD, alpha: clamp((t - 35.3) * 2) });
 }
 
 // ---------- transitions ----------
 function veil(t, tc, dur = 0.5, col = C.ivory) { const d = 1 - Math.abs((t - tc) / (dur / 2)); if (d <= 0) return; g.save(); g.globalAlpha = easeInOut(d); g.fillStyle = col; g.fillRect(0, 0, W, H); g.restore(); }
 
-const SCENES = [[0, 4.95, sOpen], [4.95, 11.9, sSteps], [11.9, 15.8, sCount], [15.8, 21.4, sBag], [21.4, 29.61, sEnd]];
+const SCENES = [[0, 4.95, sOpen], [4.95, 11.9, sSteps], [11.9, 15.8, sCount], [15.8, 21.4, sBag], [21.4, 28.4, sOrder], [28.4, 37.01, sEnd]];
 function draw(t) {
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
   for (const [a, b, fn] of SCENES) if (t >= a && t < b) fn(t);
-  veil(t, 11.9, 0.45); veil(t, 15.8, 0.5); veil(t, 21.4, 0.55);
+  veil(t, 11.9, 0.45); veil(t, 15.8, 0.5); veil(t, 21.4, 0.55, '#F3E3EF'); veil(t, 28.4, 0.55, '#F3E3EF');
   grain(t);
   // very soft vignette
   const v = g.createRadialGradient(540, 960, 600, 540, 960, 1250); v.addColorStop(0, 'rgba(101,74,112,0)'); v.addColorStop(1, 'rgba(101,74,112,.12)'); g.fillStyle = v; g.fillRect(0, 0, W, H);
@@ -204,7 +237,7 @@ function draw(t) {
 window.__ready = false; window.seek = (t) => { draw(t); return true; };
 (async () => {
   const ED = ['primer', 'cn1', 'contour', 'flora', 'liqblush', 'pro12', 'mascara', 'brow', 'halo', 'starx', 'glowcrush', 'radrouge', 'vibeout', 'spray', 'loose', 'blur', 'es25', 'aloha', 'bagc', 'bago'];
-  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('wheel', 'assets/wheel.png'), ...ED.map((k) => loadImg(k, `assets/ed/${k}.jpg`))]);
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), loadImg('wheel', 'assets/wheel.png'), loadImg('o_home', 'assets/order/01_home.png'), loadImg('o_bundles', 'assets/order/02_bundles.png'), loadImg('o_product', 'assets/order/03_product.png'), loadImg('o_add', 'assets/order/04_add.png'), ...ED.map((k) => loadImg(k, `assets/ed/${k}.jpg`))]);
   IMG.logoM = tint(IMG.logo, C.mauve); IMG.logoW = tint(IMG.logo, C.ivory);
   await Promise.all(['900 40px Cairo', '800 40px Cairo', '700 40px Cairo', '600 40px Cairo', '600 40px Tajawal', '600 40px Montserrat', '700 40px "Playfair Display"', 'italic 500 40px "Playfair Display"'].map((f) => document.fonts.load(f, 'abcأب٠57')));
   await document.fonts.ready; window.__ready = true; draw(0);

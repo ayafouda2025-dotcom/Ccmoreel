@@ -2,14 +2,14 @@
 import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 const V = process.argv[2] || 'long', SR = 48000;
-const DUR = 29.6, N = Math.ceil(DUR * SR);
+const DUR = 37.0, N = Math.ceil(DUR * SR);
 const ff = (a, input) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...a], { input, maxBuffer: 1 << 30 });
 
 // VO lines: [src_start, src_end, dst_start] in audio/vo_a.mp3
-const VO = [[0.0, 3.95, 0.6], [4.3, 11.0, 5.0], [11.1, 14.45, 12.2], [14.6, 19.75, 15.9], [19.9, 24.72, 21.6]];
+const VO = [[0.0, 3.95, 0.6, 'audio/vo2.mp3'], [4.3, 11.0, 5.0, 'audio/vo2.mp3'], [11.1, 14.45, 12.2, 'audio/vo2.mp3'], [14.6, 19.75, 15.9, 'audio/vo2.mp3'], [0.0, 6.5, 21.6, 'audio/vo_order.mp3'], [0.0, 6.5, 28.6, 'audio/vo_end.mp3']];
 const SFX = [[0.1, 'chime'], [3.4, 'swish'], [3.6, 'sparkle'], [4.95, 'swish'], [5.0, 'tap'], [5.86, 'tap'], [6.74, 'tap'], [7.61, 'tap'], [8.39, 'tap'], [9.18, 'tap'], [9.92, 'tap'], [10.88, 'tap'],
   [11.9, 'swish'], [12.3, 'tick'], [13.7, 'coin'], [14.45, 'swish'], [14.9, 'pop'], [15.15, 'sparkle'], [15.8, 'swish'], [16.04, 'pop'], [18.15, 'pop'], [19.66, 'pop'],
-  [21.4, 'swish'], [21.6, 'chime'], [22.3, 'sparkle'], [24.05, 'sparkle'], [26.6, 'pop'], [27.6, 'tap'], [27.65, 'sparkle']];
+  [21.4, 'swish'], [21.6, 'pop'], [23.84, 'pop'], [23.85, 'tap'], [24.55, 'tap'], [24.96, 'pop'], [25.45, 'tap'], [25.5, 'coin'], [26.38, 'pop'], [28.4, 'swish'], [28.6, 'chime'], [29.3, 'sparkle'], [31.7, 'sparkle'], [35.0, 'pop'], [35.9, 'tap'], [35.95, 'sparkle']];
 let seed = 7; const noise = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2147483648 - 1);
 const mtof = (m) => 440 * 2 ** ((m - 69) / 12);
 const add = (b, s, len, fn) => { const s0 = Math.floor(s * SR); for (let i = 0; i < len * SR; i++) { const k = s0 + i; if (k >= 0 && k < b.length) b[k] += fn(i / SR); } };
@@ -52,8 +52,9 @@ function wav(path, ch) { const n = ch[0].length, c = ch.length, b = Buffer.alloc
 }
 // ---------- mix ----------
 if (VO.length) {
-  const parts = VO.map(([s, e, d], i) => `[0:a]aresample=${SR},atrim=${s}:${e},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,afade=t=out:st=${(e - s - 0.05).toFixed(3)}:d=0.05,adelay=${Math.round(d * 1000)}:all=1[v${i}]`);
-  ff(['-i', 'audio/vo2.mp3', '-filter_complex', parts.join(';') + ';' + VO.map((_, i) => `[v${i}]`).join('') + `amix=inputs=${VO.length}:normalize=0,apad=whole_dur=${DUR},atrim=0:${DUR}[vo]`, '-map', '[vo]', '-ar', SR, '-ac', '1', 'audio/vo.wav']);
+  const srcs = [...new Set(VO.map((v) => v[3]))];
+  const parts = VO.map(([s, e, d, f], i) => `[${srcs.indexOf(f)}:a]aresample=${SR},atrim=${s}:${e},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,afade=t=out:st=${(e - s - 0.05).toFixed(3)}:d=0.05,adelay=${Math.round(d * 1000)}:all=1[v${i}]`);
+  ff([...srcs.flatMap((f) => ['-i', f]), '-filter_complex', parts.join(';') + ';' + VO.map((_, i) => `[v${i}]`).join('') + `amix=inputs=${VO.length}:normalize=0,apad=whole_dur=${DUR},atrim=0:${DUR}[vo]`, '-map', '[vo]', '-ar', SR, '-ac', '1', 'audio/vo.wav']);
   ff(['-i', 'audio/vo.wav', '-i', 'audio/music.wav', '-i', 'audio/sfx.wav', '-filter_complex',
     '[0:a]asplit=2[vo][sc];[1:a]volume=0.32[mu];[mu][sc]sidechaincompress=threshold=0.02:ratio=10:attack=10:release=300[duck];[vo]volume=1.3,aformat=channel_layouts=stereo[v];[2:a]volume=0.7,aformat=channel_layouts=stereo[s];[v][duck][s]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]',
     '-map', '[a]', '-ar', SR, 'out/mix.wav']);
