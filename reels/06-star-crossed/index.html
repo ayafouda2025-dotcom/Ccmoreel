@@ -1,0 +1,299 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kara Duo — Reel 06 · Star-Crossed Dreams</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>html,body{margin:0;background:#1E1424;height:100%}canvas{display:block;height:100vh;margin:auto}</style>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// Kara Duo · Reel 06 "ستار كروسد دريمز" — a night-sky film for the shimmer spray: stardust, constellations, four moons.
+// Real product photos sit on glowing "moon" discs (white backgrounds dissolve with multiply). Pure function of t.
+const W = 1080, H = 1920, DUR = 37.5;
+const g = document.getElementById('c').getContext('2d');
+const C = { ivory: '#FAF7F8', lav: '#D0B9D9', lavL: '#E7DAEC', lavLL: '#F3ECF6', lavD: '#A98BB5', mauve: '#654A70', mauveD: '#4F3859', ink: '#2B1C33', night: '#1E1424', pink: '#DD4E94', pinkL: '#E98ABC', pinkLL: '#F8D7E8', gold: '#F2CF83' };
+const SHADES = [  // name, arabic, swatch (from the store's shade picker), image key, spoken at
+  ['FIRST LOVE', 'فيرست لوف', '#EDC5B6', 'first_love', 19.54],
+  ['STARRY NIGHT', 'ستاري نايت', '#F7D484', 'starry_night', 20.58],
+  ['MOONDUST', 'مون دست', '#E5E5E5', 'moondust', 21.7],
+  ['MIDNIGHT KISS', 'ميدنايت كيس', '#F8CDEE', 'midnight_kiss', 22.58],
+];
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x)), lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3), easeIn = (x) => Math.pow(clamp(x), 3);
+const easeInOut = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const expo = (x) => { x = clamp(x); return x === 1 ? 1 : 1 - Math.pow(2, -10 * x); };
+function spring(t, k = 170, d = 26) { if (t <= 0) return 0; const w0 = Math.sqrt(k), z = d / (2 * w0);
+  if (z < 1) { const wd = w0 * Math.sqrt(1 - z * z); return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t)); }
+  return 1 - Math.exp(-w0 * t) * (1 + w0 * t); }
+const SOFT = (t) => spring(t, 120, 22), SILK = (t) => spring(t, 80, 18), POP = (t) => spring(t, 220, 17);
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const AR = (n) => String(n).replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[d]);
+const IMG = {};
+function loadImg(k, src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => { IMG[k] = i; res(); }; i.onerror = rej; i.src = src; }); }
+function tint(img, color) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height); return c; }
+
+function text(s, x, y, { size = 60, weight = 800, family = 'Cairo', color = C.ivory, align = 'center', alpha = 1, spacing = 0, maxW = 0, italic = false, glow = 0 } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.font = `${italic ? 'italic ' : ''}${weight} ${size}px "${family}"`;
+  if (maxW) { const w = g.measureText(s).width; if (w > maxW) { size *= maxW / w; g.font = `${italic ? 'italic ' : ''}${weight} ${size}px "${family}"`; } }
+  if (spacing) g.letterSpacing = spacing + 'px'; g.textAlign = align; g.textBaseline = 'middle'; g.direction = /[؀-ۿ]/.test(s) ? 'rtl' : 'ltr';
+  if (glow) { g.shadowColor = typeof glow === 'string' ? glow : 'rgba(248,215,232,.8)'; g.shadowBlur = 30; }
+  g.fillStyle = color; g.fillText(s, x, y); g.restore();
+}
+// shimmering gradient text (a light band travels across the letters)
+function shimmerText(s, x, y, size, t, k, { weight = 900, base = C.ivory, hi = '#FFFFFF', tintc = C.pinkLL } = {}) {
+  if (k <= 0) return; g.save(); g.globalAlpha = clamp(k * 2); g.font = `${weight} ${size}px "Cairo"`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.direction = 'rtl';
+  const w = g.measureText(s).width, ph = ((t * 0.6) % 1.6) - 0.3, gr = g.createLinearGradient(x - w / 2, 0, x + w / 2, 0);
+  gr.addColorStop(0, tintc); gr.addColorStop(clamp(ph - 0.15), base); gr.addColorStop(clamp(ph), hi); gr.addColorStop(clamp(ph + 0.15), base); gr.addColorStop(1, tintc);
+  g.shadowColor = 'rgba(233,138,188,.7)'; g.shadowBlur = 40; g.fillStyle = gr;
+  g.save(); g.beginPath(); g.rect(0, y - size, W, size * 2); g.clip(); g.fillText(s, x, y + (1 - easeOut(k)) * size * 0.9); g.restore(); g.restore();
+}
+function revealText(s, x, y, k, opt = {}) { if (k <= 0) return; const size = opt.size || 60;
+  g.save(); g.beginPath(); g.rect(0, y - size * 0.95, W, size * 1.9); g.clip(); text(s, x, y + (1 - easeOut(k)) * size * 1.2, { ...opt, alpha: (opt.alpha ?? 1) * clamp(k * 2) }); g.restore(); }
+function star4(x, y, r, col = '#fff', a = 1) { if (r <= 0) return; g.save(); g.globalAlpha *= a; g.fillStyle = col; g.beginPath();
+  g.moveTo(x, y - r); g.quadraticCurveTo(x, y, x + r, y); g.quadraticCurveTo(x, y, x, y + r); g.quadraticCurveTo(x, y, x - r, y); g.quadraticCurveTo(x, y, x, y - r); g.fill(); g.restore(); }
+function pill(cx, cy, w, h, fill, stroke = null) { g.save(); g.shadowColor = 'rgba(221,78,148,.35)'; g.shadowBlur = 30; g.fillStyle = fill; g.beginPath(); g.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2); g.fill(); if (stroke) { g.shadowColor = 'transparent'; g.strokeStyle = stroke; g.lineWidth = 2; g.stroke(); } g.restore(); }
+
+// ---------- the night sky ----------
+const SKY = (() => { const r = rng(2026), s = []; for (let i = 0; i < 260; i++) s.push([r() * W, r() * H, 0.6 + r() * 2.4, r() * 6.28, 0.6 + r() * 2.4]); return s; })();
+function sky(t, { drift = 1, warm = 0 } = {}) {
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#1E1424'); gr.addColorStop(0.5, warm ? '#3A2742' : '#2B1C33'); gr.addColorStop(1, '#4F3859'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  // nebula
+  g.save(); g.filter = 'blur(110px)'; g.globalCompositeOperation = 'lighter';
+  [[260, 520, 320, 'rgba(221,78,148,.20)'], [860, 1100, 380, 'rgba(169,139,181,.24)'], [380, 1650, 360, 'rgba(208,185,217,.18)'], [820, 300, 240, 'rgba(242,207,131,.10)']].forEach(([x, y, r, c], i) => {
+    g.fillStyle = c; g.beginPath(); g.arc(x + Math.sin(t * 0.2 + i) * 70, y + Math.cos(t * 0.17 + i) * 60, r, 0, Math.PI * 2); g.fill(); });
+  g.restore();
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (const [x, y, s, ph, sp] of SKY) { const tw = 0.45 + 0.55 * Math.sin(t * sp + ph), yy = (y + t * 6 * drift * s) % H;
+    g.fillStyle = `rgba(255,245,252,${0.25 + 0.6 * tw})`; g.beginPath(); g.arc(x, yy, s * (0.7 + 0.3 * tw), 0, Math.PI * 2); g.fill();
+    if (s > 2.6 && tw > 0.85) star4(x, yy, s * 4, 'rgba(255,240,250,.8)'); }
+  g.restore();
+}
+// stardust burst: deterministic particles from (x,y) at t0
+function stardust(t, t0, x, y, { n = 160, speed = 900, life = 2.2, spread = Math.PI * 2, dir = -Math.PI / 2, seed = 1, cols = ['#FFFFFF', '#F8D7E8', '#F2CF83', '#E7DAEC'], grav = 120, size = 5 } = {}) {
+  const d = t - t0; if (d < 0 || d > life + 0.5) return; const r = rng(seed);
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < n; i++) {
+    const a = dir + (r() - 0.5) * spread, v = speed * (0.25 + r() * 0.75), lf = life * (0.5 + r() * 0.5), s = size * (0.4 + r());
+    if (d > lf) continue; const drag = (1 - Math.exp(-d * 2.4)) / 2.4;
+    const px = x + Math.cos(a) * v * drag + Math.sin(d * 3 + i) * 6, py = y + Math.sin(a) * v * drag + grav * d * d * 0.5;
+    const fade = (1 - d / lf), tw = 0.5 + 0.5 * Math.sin(d * 18 + i);
+    g.fillStyle = cols[i % cols.length]; g.globalAlpha = fade * (0.5 + 0.5 * tw);
+    if (i % 9 === 0) star4(px, py, s * 3, cols[i % cols.length]); else { g.beginPath(); g.arc(px, py, s * (0.6 + 0.4 * tw), 0, Math.PI * 2); g.fill(); }
+  }
+  g.restore();
+}
+// a glowing moon disc with a real product photo on it
+function moon(cx, cy, r, key, t, { tintc = C.ivory, alpha = 1, glow = 1, ph = 0 } = {}) {
+  if (r <= 0) return; g.save(); g.globalAlpha *= alpha;
+  g.save(); g.globalCompositeOperation = 'lighter'; const hg = g.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 1.9); hg.addColorStop(0, `rgba(248,215,232,${0.35 * glow})`); hg.addColorStop(1, 'rgba(248,215,232,0)'); g.fillStyle = hg; g.beginPath(); g.arc(cx, cy, r * 1.9, 0, Math.PI * 2); g.fill(); g.restore();
+  const mg = g.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.1, cx, cy, r); mg.addColorStop(0, '#FFFFFF'); mg.addColorStop(0.7, '#FBF6FA'); mg.addColorStop(1, tintc);
+  g.fillStyle = mg; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+  if (key && IMG[key]) { const im = IMG[key], h = r * 1.5, w = h * im.width / im.height; g.save(); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.clip(); g.globalCompositeOperation = 'multiply'; g.imageSmoothingQuality = 'high';
+    g.drawImage(im, cx - w / 2, cy - h / 2 + Math.sin(t * 1.3 + ph) * 6, w, h); g.restore(); }
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, r + 10, 0, Math.PI * 2); g.stroke();
+  g.restore();
+}
+function photoCircle(key, cx, cy, r, { alpha = 1, zoom = 1, ox = 0.5, oy = 0.45 } = {}) { const im = IMG[key]; if (!im || r <= 0) return;
+  g.save(); g.globalAlpha *= alpha; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.clip(); const s = (2 * r / Math.min(im.width, im.height)) * zoom;
+  g.drawImage(im, cx - im.width * s * ox, cy - im.height * s * oy, im.width * s, im.height * s); g.restore();
+  g.save(); g.globalAlpha *= alpha; g.strokeStyle = 'rgba(248,215,232,.8)'; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, r + 8, 0, Math.PI * 2); g.stroke(); g.restore(); }
+function logo(cx, cy, w, a = 1, key = 'logoW') { const L = IMG[key]; if (!L) return; const h = w * L.height / L.width; g.save(); g.globalAlpha *= a; g.drawImage(L, cx - w / 2, cy - h / 2, w, h); g.restore(); }
+
+// ================= S1 hook 0–4.4: a shooting star, one puff, a stardust explosion =================
+function sHook(t) {
+  sky(t);
+  logo(540, 170, 300, clamp((t - 0.25) * 3));
+  // shooting star
+  const sd = (t - 0.15) / 0.95;
+  if (sd > 0 && sd < 1.15) { const x = lerp(1150, 540, easeIn(clamp(sd))), y = lerp(-60, 980, easeIn(clamp(sd)));
+    g.save(); g.globalCompositeOperation = 'lighter'; const tg = g.createLinearGradient(x, y, x + 300, y - 520); tg.addColorStop(0, 'rgba(255,255,255,.95)'); tg.addColorStop(1, 'rgba(248,215,232,0)');
+    g.strokeStyle = tg; g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 300, y - 520); g.stroke(); star4(x, y, 34, '#fff'); g.restore(); }
+  // the puff
+  const fk = clamp((t - 1.1) / 0.25); if (fk > 0) { g.save(); g.globalCompositeOperation = 'lighter'; const fg = g.createRadialGradient(540, 980, 0, 540, 980, 700); fg.addColorStop(0, `rgba(255,240,250,${0.9 * (1 - clamp((t - 1.35) / 0.6))})`); fg.addColorStop(1, 'rgba(255,240,250,0)'); g.fillStyle = fg; g.fillRect(0, 0, W, H); g.restore(); }
+  stardust(t, 1.2, 540, 980, { n: 320, speed: 1300, life: 2.8, seed: 3, grav: 60, size: 6 });
+  stardust(t, 1.3, 540, 980, { n: 120, speed: 500, life: 3.0, seed: 9, grav: 20, size: 4 });
+  shimmerText('رشّة وحدة…', 540, 860, 150, t, (t - 1.35) / 0.45);
+  shimmerText('وتلمعين', 540, 1080, 190, t, (t - 2.7) / 0.45, { tintc: C.gold });
+}
+
+// ================= S2 4.4–9.9: the product on a rising full moon =================
+function sHero(t) {
+  sky(t);
+  const mk = SILK(t - 4.4), cy = lerp(1500, 930, mk);
+  // orbit rings
+  g.save(); g.globalAlpha = clamp((t - 4.8) * 2); g.strokeStyle = 'rgba(231,218,236,.35)'; g.lineWidth = 2;
+  for (const [rx, ry, rot] of [[470, 140, -0.25], [520, 170, 0.2]]) { g.beginPath(); g.ellipse(540, cy, rx, ry, rot, 0, Math.PI * 2); g.stroke(); }
+  g.restore();
+  moon(540, cy, 330, 'midnight_kiss', t, { tintc: '#F1DDF0' });
+  for (let i = 0; i < 3; i++) { const a = t * 0.9 + i * 2.1; star4(540 + Math.cos(a) * 480, cy + Math.sin(a) * 150 - 0.25 * Math.cos(a) * 140, 16, i % 2 ? C.gold : '#fff', clamp((t - 5) * 2)); }
+  text('STAR-CROSSED DREAMS', 540, 260, { size: 64, weight: 500, family: 'Playfair Display', italic: true, color: C.pinkLL, alpha: clamp((t - 4.75) * 2.5), glow: true, maxW: 960 });
+  revealText('ستار كروسد دريمز', 540, 360, (t - 5.2) / 0.5, { size: 74, weight: 900, color: C.ivory, glow: true });
+  const c1 = POP(t - 7.1), c2 = POP(t - 8.3);
+  if (c1 > 0) { g.save(); g.translate(330, 1430); g.scale(c1, c1); pill(0, 0, 420, 100, 'rgba(250,247,248,.12)', 'rgba(248,215,232,.7)'); text('بودرة بملمس ناعم', 0, -2, { size: 40, weight: 700 }); g.restore(); }
+  if (c2 > 0) { g.save(); g.translate(750, 1560); g.scale(c2, c2); pill(0, 0, 380, 100, 'rgba(221,78,148,.85)'); text('لمعة خفيفة ✦', 0, -2, { size: 40, weight: 800 }); g.restore(); }
+  text('عبوة كلاسيكية بمضخة رش', 540, 1700, { size: 32, weight: 600, family: 'Tajawal', color: C.lav, alpha: clamp((t - 8.9) * 2) });
+  stardust(t, 8.32, 760, 1530, { n: 70, speed: 420, life: 1.4, seed: 21, grav: 200, size: 4 });
+}
+
+// ================= S3 9.9–15.5: constellations — face, hair, body =================
+// hand-drawn constellation paths (normalised 0..1 inside a 760x760 box)
+const CONST = {
+  face: [[.62, .05], [.58, .2], [.62, .33], [.72, .45], [.64, .5], [.66, .56], [.6, .6], [.63, .66], [.56, .74], [.44, .8], [.3, .78]],
+  hair: [[.58, .02], [.36, .1], [.24, .3], [.28, .5], [.2, .66], [.3, .8], [.22, .96], [.42, .9], [.4, .7], [.5, .52], [.44, .32]],
+  body: [[.24, .02], [.28, .26], [.18, .4], [.46, .44], [.78, .4], [.95, .5], [.98, .9], [.62, .54], [.5, .62], [.34, .54]],
+};
+const USES = [['face', 'وجهك', 'FACE', 10.2, 10.8, 'shoulder', 2.1, 0.45, 0.24], ['hair', 'شعرك', 'HAIR', 12.0, 12.29, 'spray_shoulder', 2.0, 0.24, 0.24], ['body', 'جسمك', 'BODY', 13.8, 14.16, 'collar', 1.25, 0.55, 0.55]];
+function constellation(key, ox, oy, size, k, t) {
+  const pts = CONST[key].map(([x, y]) => [ox + x * size, oy + y * size]), n = pts.length, prog = k * (n - 1);
+  g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(248,215,232,.75)'; g.lineWidth = 3; g.shadowColor = 'rgba(233,138,188,.9)'; g.shadowBlur = 18;
+  g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < n; i++) { const f = clamp(prog - (i - 1)); if (f <= 0) break; g.lineTo(lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)); }
+  g.stroke(); g.shadowBlur = 0;
+  pts.forEach(([x, y], i) => { const on = clamp(prog - i + 1); if (on <= 0) return; const tw = 0.7 + 0.3 * Math.sin(t * 5 + i); star4(x, y, 16 * on * tw, i % 3 ? '#fff' : C.gold); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, 5 * on, 0, Math.PI * 2); g.fill(); });
+  g.restore();
+  return pts;
+}
+function sUses(t) {
+  sky(t, { drift: 0.6 });
+  let cur = 0; USES.forEach((u, i) => { if (t >= u[3] - 0.1) cur = i; });
+  const [key, ar, en, t0, tw, ph, zm, ox, oy] = USES[cur], k = easeInOut((t - t0) / 1.0), out = clamp((USES[cur + 1] ? USES[cur + 1][3] - t : 99) / 0.25);
+  g.save(); g.globalAlpha = Math.min(1, out);
+  // the real photo from the product page, framed like a moon, slowly pushing in
+  const pk = SILK(t - t0 + 0.05), zz = zm * (1 + 0.06 * clamp((t - t0) / 1.8));
+  photoCircle(ph, 540, 1040, 370 * (0.85 + 0.15 * pk), { alpha: clamp(pk * 2), zoom: zz, ox, oy });
+  g.save(); g.beginPath(); g.arc(540, 1040, 370, 0, Math.PI * 2); g.clip(); g.fillStyle = 'rgba(30,20,36,.28)'; g.fillRect(0, 0, W, H); g.restore();
+  const pts = constellation(key, 230, 730, 620, k, t);
+  if (k >= 1) pts.forEach(([x, y], i) => stardust(t, t0 + 1.0 + i * 0.03, x, y, { n: 14, speed: 160, life: 1.0, seed: 40 + i + cur * 20, grav: 160, size: 3.5 }));
+  text(en, 540, 330, { size: 44, weight: 500, family: 'Playfair Display', italic: true, color: C.pinkL, spacing: 10, alpha: clamp((t - t0) * 3) });
+  shimmerText(ar, 540, 450, 150, t, (t - tw + 0.1) / 0.4);
+
+  stardust(t, tw, 540, 1040, { n: 120, speed: 600, life: 1.6, seed: 300 + cur, grav: 80, size: 4.5 });
+  g.restore();
+  // three dots progress
+  for (let i = 0; i < 3; i++) { g.fillStyle = i <= cur ? C.pink : 'rgba(231,218,236,.35)'; g.beginPath(); g.arc(470 + i * 70, 1860, 9, 0, Math.PI * 2); g.fill(); }
+}
+
+// ================= S4 15.5–18.1: day and night =================
+function sDayNight(t) {
+  sky(t, { warm: 1 });
+  const split = lerp(1.0, 0.0, easeInOut((t - 16.35) / 0.8));                      // 1 = all day, 0 = all night
+  const dayK = SOFT(t - 15.55);
+  // day half (warm photo)
+  g.save(); g.beginPath(); g.rect(0, 0, W * Math.max(0.5, split) + (1 - dayK) * -W, H); g.clip();
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#F6E2D4'); gr.addColorStop(1, '#EBC9C9'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  photoCircle('spray_shoulder', 540, 980, 360, { zoom: 1.0, ox: 0.5, oy: 0.45 });
+  g.save(); g.globalCompositeOperation = 'lighter'; const sg = g.createRadialGradient(860, 320, 0, 860, 320, 240); sg.addColorStop(0, 'rgba(255,236,190,.9)'); sg.addColorStop(1, 'rgba(255,236,190,0)'); g.fillStyle = sg; g.fillRect(560, 60, 520, 520); g.restore();
+  shimmerText('ليومك…', 540, 470, 150, t, (t - 15.6) / 0.4, { base: C.mauve, hi: '#FFFFFF', tintc: C.pink });
+  g.restore();
+  // night overtakes from the right
+  if (split < 1) { g.save(); g.beginPath(); g.rect(W * split, 0, W, H); g.clip(); sky(t, { warm: 0 });
+    photoCircle('shoulder', 540, 980, 360, { zoom: 1.0, ox: 0.5, oy: 0.42 });
+    star4(870, 330, 40, C.gold); g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,240,250,.9)'; g.beginPath(); g.arc(860, 330, 70, 0, Math.PI * 2); g.fill(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.arc(890, 310, 62, 0, Math.PI * 2); g.fill(); g.restore();
+    shimmerText('ولسهراتك', 540, 470, 150, t, (t - 16.46) / 0.4);
+    stardust(t, 16.6, 540, 980, { n: 140, speed: 700, life: 1.8, seed: 77, grav: 60 });
+    g.restore(); }
+}
+
+// ================= S5 18.1–24.7: four shades as four moons =================
+function sShades(t) {
+  sky(t);
+  text('٤ درجات', 540, 250, { size: 96, weight: 900, color: C.ivory, glow: true, alpha: clamp((t - 18.55) * 3) });
+  text('FOUR SHADES', 540, 340, { size: 30, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 12, alpha: clamp((t - 18.7) * 3) });
+  const POS = [[780, 720], [300, 720], [780, 1290], [300, 1290]];               // RTL reading order
+  let cur = -1; SHADES.forEach((s, i) => { if (t >= s[4]) cur = i; });
+  SHADES.forEach(([en, ar, sw, key, ti], i) => {
+    const k = SOFT(t - 18.2 - i * 0.12), [x, y] = POS[i], on = i === cur, lift = on ? SOFT(t - ti) : (i < cur ? 1 - SOFT(t - SHADES[i + 1][4]) : 0);
+    const r = 190 * k * (1 + 0.12 * lift);
+    moon(x, y - 20 * lift, r, key, t, { tintc: sw, glow: 0.6 + 0.8 * lift, ph: i, alpha: on || cur < 0 ? 1 : 0.75 + 0.25 * (i < cur ? 1 : 0.6) });
+    const tk = clamp((t - ti + 0.05) * 3);
+    text(en, x, y + 250, { size: 38, weight: 500, family: 'Playfair Display', italic: true, color: on ? C.pinkLL : C.lav, alpha: Math.max(0.35 * k, tk), maxW: 420 });
+    text(ar, x, y + 305, { size: 36, weight: 800, color: C.ivory, alpha: Math.max(0.25 * k, tk) });
+    g.save(); g.fillStyle = sw; g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(x, y + 360, 16 * k, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore();
+    if (t >= ti) stardust(t, ti, x, y - 20, { n: 70, speed: 420, life: 1.3, seed: 90 + i, grav: 120, size: 4, cols: ['#FFFFFF', sw, sw, C.pinkLL] });
+  });
+  revealText('اختاري لمعتك', 540, 1760, (t - 23.4) / 0.5, { size: 72, weight: 900, color: C.pinkLL, glow: true });
+}
+
+// ================= S6 24.7–30.9: how to order (real store screens, prices hidden) =================
+const OSTEPS = [['karaduo.com', 24.93], ['قسم الوجه', 26.99], ['اختاري درجتك', 27.67], ['أضيفيها للسلة', 28.79]];
+function phone(cx, top, w, key) {
+  const im = IMG[key], s = w / im.width, h = 932 * 2 * s;
+  g.save(); g.shadowColor = 'rgba(233,138,188,.45)'; g.shadowBlur = 70; g.fillStyle = '#120C16'; g.beginPath(); g.roundRect(cx - w / 2 - 18, top - 18, w + 36, h + 36, 64); g.fill(); g.restore();
+  g.save(); g.beginPath(); g.roundRect(cx - w / 2, top, w, h, 48); g.clip(); g.imageSmoothingQuality = 'high'; g.drawImage(im, cx - w / 2, top, w, h); g.restore();
+  return { x0: cx - w / 2, y0: top, s: s * 2 };
+}
+function touch(x, y, t, ti) { const d = t - ti; if (d < -0.35 || d > 0.45) return; const p = d < 0 ? 0 : Math.sin(clamp(d / 0.25) * Math.PI);
+  g.save(); g.globalAlpha = clamp((d + 0.35) / 0.12) * clamp((0.45 - d) / 0.12); g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(x, y, 34 + p * 10, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = C.pink; g.lineWidth = 5; g.stroke(); if (d > 0) { g.strokeStyle = `rgba(221,78,148,${1 - d / 0.45})`; g.beginPath(); g.arc(x, y, 40 + d * 200, 0, Math.PI * 2); g.stroke(); } g.restore(); }
+function sOrder(t) {
+  sky(t, { drift: 0.4 });
+  text('HOW TO ORDER', 540, 190, { size: 28, weight: 600, family: 'Montserrat', color: C.lavD, spacing: 12, alpha: clamp((t - 24.75) * 2) });
+  revealText('اطلبيها من المتجر', 540, 280, (t - 24.8) / 0.5, { size: 74, weight: 900, color: C.ivory, glow: true });
+  let key = 'o_home'; if (t >= 26.95 && t < 27.45) key = 'o_face'; else if (t >= 27.45) key = 'o_shades';
+  const pk = SILK(t - 24.75), ph = phone(700 + (1 - pk) * 520, 400, 500, key), X = (x) => ph.x0 + x * ph.s, Y = (y) => ph.y0 + y * ph.s;
+  if (key === 'o_home') touch(X(195), Y(615), t, 26.8);
+  if (key === 'o_face') touch(X(315), Y(300), t, 27.3);
+  if (key === 'o_shades') {
+    touch(X(339), Y(248), t, 27.95); touch(X(215), Y(360), t, 28.95);
+    if (t > 27.95) { // shade chosen: gold dot ringed, label reads STARRY NIGHT
+      g.save(); g.strokeStyle = C.pink; g.lineWidth = 4; g.beginPath(); g.arc(X(339), Y(248), 15 * ph.s, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = '#FFFFFF'; g.fillRect(X(250), Y(203), X(372) - X(250), 26 * ph.s); g.restore();
+      text('STARRY NIGHT', X(370), Y(214), { size: 13 * ph.s, weight: 500, family: 'Montserrat', color: '#3A2944', align: 'right' }); }
+  }
+  if (t > 29.0) { const k = POP(t - 29.0); g.save(); g.translate(700, 620); g.scale(k, k); pill(0, 0, 440, 96, C.pink); text('أُضيفت للسلة ✓', 0, -2, { size: 38, weight: 800 }); g.restore(); }
+  OSTEPS.forEach(([lab, ti], i) => { const on = t >= ti, k = SOFT(t - ti), y = 560 + i * 240;
+    g.save(); g.globalAlpha = on ? clamp(k * 2) : 0.35;
+    text('0' + (i + 1), 205, y - 40, { size: 104, weight: 500, family: 'Playfair Display', italic: true, color: on ? C.pinkL : C.lavD, glow: on ? 'rgba(233,138,188,.8)' : 0 });
+    const latin = lab === 'karaduo.com'; text(lab, 205, y + 55, { size: latin ? 32 : 36, weight: latin ? 700 : 800, family: latin ? 'Montserrat' : 'Cairo', color: C.ivory, maxW: 330 });
+    if (i < 3) { g.strokeStyle = 'rgba(231,218,236,.45)'; g.lineWidth = 2; g.beginPath(); g.moveTo(205, y + 95); g.lineTo(205, y + 95 + 50 * (on ? k : 0)); g.stroke(); }
+    g.restore(); });
+  const dk = POP(t - 29.9); if (dk > 0) { g.save(); g.translate(540, 1800); g.scale(dk, dk); pill(0, 0, 900, 104, 'rgba(250,247,248,.14)', 'rgba(248,215,232,.7)'); text('الرياض خلال يومين · الخليج خلال ٥ أيام', 0, -2, { size: 38, weight: 800 }); g.restore(); }
+}
+
+// ================= S7 30.9–37.5: stardust gathers into the Kara Duo logo =================
+let LOGO_PTS = null;
+function sEnd(t) {
+  sky(t);
+  const LX = 540, LY = 760, LW = 640;
+  if (LOGO_PTS) { const k = easeInOut((t - 30.95) / 1.15), r = rng(5), fade = 1 - clamp((t - 32.2) / 0.5);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    LOGO_PTS.forEach(([px, py], i) => { const sx = r() * W, sy = r() * H, x = lerp(sx, LX + px * LW, k) + Math.sin(t * 3 + i) * 3 * (1 - k), y = lerp(sy, LY + py * LW, k) + Math.cos(t * 2.6 + i) * 3 * (1 - k);
+      g.globalAlpha = 0.85 * fade + 0.15; g.fillStyle = i % 5 ? '#FFF2FA' : C.gold; g.beginPath(); g.arc(x, y, 2.6, 0, Math.PI * 2); g.fill(); });
+    g.restore(); }
+  logo(LX, LY + IMG.logoW.height / IMG.logoW.width * LW / 2, LW, clamp((t - 31.9) / 0.5));
+  if (t > 31.9 && t < 33) stardust(t, 31.95, LX, LY + 90, { n: 160, speed: 900, life: 1.5, seed: 123, grav: 40 });
+  // slogan
+  [['صُنع', 32.1], ['ليعتني', 32.74], ['بجمالك', 33.3]].reduce((x, [w, ti]) => { g.save(); g.font = '800 70px "Cairo"'; const ww = g.measureText(w).width; g.restore();
+    revealText(w, x - ww / 2, 1110, (t - ti) / 0.45, { size: 70, weight: 800, color: C.ivory, glow: true }); return x - ww - 22; }, 540 + 220);
+  // four little moons line up under the slogan
+  SHADES.forEach(([en, ar, sw, key], i) => { const k = SOFT(t - 33.6 - i * 0.1); moon(780 - i * 160, 1340, 62 * k, key, t, { tintc: sw, glow: 0.5, ph: i }); });
+  text('STAR-CROSSED DREAMS', 540, 1460, { size: 40, weight: 500, family: 'Playfair Display', italic: true, color: C.pinkLL, alpha: clamp((t - 34.0) * 2) });
+  const ck = POP(t - 34.5), press = t > 35.6 ? 1 - 0.05 * Math.sin(clamp((t - 35.6) / 0.3) * Math.PI) : 1;
+  if (ck > 0) { g.save(); g.translate(540, 1620); g.scale(ck * press, ck * press); pill(0, 0, 720, 124, C.pink); text('اطلبيها من karaduo.com', 0, -2, { size: 48, weight: 800 }); g.restore(); }
+  text('الوجه  ←  إضاءة  ←  ستار كروسد دريمز', 540, 1735, { size: 32, weight: 600, family: 'Tajawal', color: C.lav, alpha: clamp((t - 34.8) * 2) });
+  if (t > 35.6) stardust(t, 35.6, 540, 1620, { n: 80, speed: 500, life: 1.2, seed: 321, grav: 150, size: 4 });
+}
+
+function veil(t, tc, dur = 0.5, col = '#1E1424') { const d = 1 - Math.abs((t - tc) / (dur / 2)); if (d <= 0) return; g.save(); g.globalAlpha = easeInOut(d); g.fillStyle = col; g.fillRect(0, 0, W, H); g.restore(); }
+function flash(t, tc, dur = 0.4) { const d = 1 - Math.abs((t - tc) / (dur / 2)); if (d <= 0) return; g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.85 * easeInOut(d); g.fillStyle = '#FFE9F4'; g.fillRect(0, 0, W, H); g.restore(); }
+
+const SCENES = [[0, 4.4, sHook], [4.4, 9.9, sHero], [9.9, 15.5, sUses], [15.5, 18.1, sDayNight], [18.1, 24.7, sShades], [24.7, 30.9, sOrder], [30.9, 37.51, sEnd]];
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  for (const [a, b, fn] of SCENES) if (t >= a && t < b) fn(t);
+  flash(t, 4.4); veil(t, 9.9); flash(t, 15.5); veil(t, 18.1); veil(t, 24.7); flash(t, 30.9, 0.5);
+  const v = g.createRadialGradient(540, 960, 650, 540, 960, 1300); v.addColorStop(0, 'rgba(20,12,24,0)'); v.addColorStop(1, 'rgba(20,12,24,.45)'); g.fillStyle = v; g.fillRect(0, 0, W, H);
+}
+window.__ready = false; window.seek = (t) => { draw(t); return true; };
+(async () => {
+  const ED = ['first_love', 'starry_night', 'moondust', 'midnight_kiss'];
+  await Promise.all([loadImg('logo', 'assets/logo.webp'), ...ED.map((k) => loadImg(k, `assets/ed/${k}.jpg`)), ...['spray_shoulder', 'shoulder', 'collar'].map((k) => loadImg(k, `assets/life/${k}.jpg`)),
+    loadImg('o_home', 'assets/order/01_home.png'), loadImg('o_face', 'assets/order/02_face.png'), loadImg('o_shades', 'assets/order/04_shades.png')]);
+  IMG.logoW = tint(IMG.logo, C.ivory);
+  // sample the logo into particle targets
+  { const L = IMG.logo, c = document.createElement('canvas'), w = 320, h = Math.round(w * L.height / L.width); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(L, 0, 0, w, h);
+    const d = x.getImageData(0, 0, w, h).data; LOGO_PTS = []; for (let yy = 0; yy < h; yy += 2) for (let xx = 0; xx < w; xx += 2) if (d[(yy * w + xx) * 4 + 3] > 120) LOGO_PTS.push([xx / w - 0.5, yy / w]); }
+  await Promise.all(['900 40px Cairo', '800 40px Cairo', '700 40px Cairo', '600 40px Tajawal', '600 40px Montserrat', '500 40px Montserrat', 'italic 500 40px "Playfair Display"'].map((f) => document.fonts.load(f, 'abcأب٠')));
+  await document.fonts.ready; window.__ready = true; draw(0);
+  if (!navigator.webdriver) { const t0 = performance.now(); (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })(); }
+})();
+</script>
