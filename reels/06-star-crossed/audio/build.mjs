@@ -7,7 +7,7 @@ const ff = (a, input) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'e
 
 // VO lines: [src_start, src_end, dst_start] in audio/vo_a.mp3
 const F = 'audio/vo.mp3';
-const VO = [[0.0, 2.5, 1.2, F], [3.0, 7.95, 4.6, F], [8.0, 8.85, 10.2, F], [9.0, 9.85, 12.0, F], [10.0, 10.95, 13.8, F], [11.3, 13.25, 15.6, F], [13.3, 18.95, 18.2, F], [19.05, 24.35, 24.8, F], [24.5, 27.8, 31.0, F]];
+const VO = [[0.0, 2.4, 1.41, 'audio/vo_hook.mp3'], [3.0, 7.95, 4.6, F], [8.0, 8.85, 10.2, F], [9.0, 9.85, 12.0, F], [10.0, 10.95, 13.8, F], [11.3, 13.25, 15.6, F], [13.3, 18.95, 18.2, F], [19.05, 24.35, 24.8, F], [24.5, 27.8, 31.0, F]];
 const SFX = [[0.2, 'swish'], [1.15, 'chime'], [1.2, 'sparkle'], [1.25, 'sparkle'], [2.7, 'sparkle'], [4.4, 'chime'], [4.5, 'swish'], [7.1, 'pop'], [8.3, 'sparkle'],
   [9.9, 'swish'], [10.25, 'sparkle'], [11.2, 'sparkle'], [12.0, 'swish'], [12.05, 'sparkle'], [13.0, 'sparkle'], [13.8, 'swish'], [13.85, 'sparkle'], [14.8, 'sparkle'],
   [15.5, 'chime'], [16.4, 'swish'], [16.6, 'sparkle'], [18.1, 'swish'], [19.54, 'sparkle'], [20.58, 'sparkle'], [21.7, 'sparkle'], [22.58, 'sparkle'], [23.4, 'chime'],
