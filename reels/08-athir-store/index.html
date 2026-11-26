@@ -1,0 +1,476 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>html,body{margin:0;background:#0B1424}canvas{display:block}</style>
+</head><body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// TwinAI e-store proposal for مؤسسة الأثير الماسي — 1920x1080, window.seek(t) paints frame t
+const W = 1920, H = 1080, DUR = 73.0;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const A = { cyan: '#4EF2F3', blue: '#2276B4', royal: '#1A77E1', deep: '#0E2A47', sky: '#E8FBFC' };
+const C = { bg: '#0B1424', bg2: '#0F1B2E', navy: '#0F1B2E', panel: '#16263F', teal: '#0E7C8C', teal2: '#12909F', tealD: '#0A5F6C', cyan: '#55D6E6',
+  white: '#F3F6FA', mut: '#8C9BB2', mut2: '#5D6C84', cream: '#F4F1EA', app: '#F3F5F8', card: '#FFFFFF', ink: '#0F1B2E', ink2: '#45536A', line: '#E3E8EF',
+  amber: '#B2702E', green: '#25D366', greenD: '#128C4A', red: '#E5566B', gold: '#F2B93B', bubble: '#E6F7F9' };
+
+// ---- VO segments [src_start, src_end, dst_start] (audio/vo_a.mp3) ----
+const SEG = [[0.05, 4.98, 0.6], [5.06, 8.98, 6.0], [9.20, 14.60, 10.6], [14.78, 19.34, 17.0], [19.50, 29.00, 22.4], [29.01, 35.50, 32.6],
+  [35.50, 40.80, 39.8], [40.80, 45.74, 45.8], [45.74, 48.36, 51.4], [48.37, 53.90, 54.8], [53.90, 57.82, 61.1], [57.90, 61.40, 66.0]];
+const V = (s) => { for (const [a, b, d] of SEG) if (s < b) return s >= a ? d + s - a : d - Math.min(0.3, a - s); const [a, , d] = SEG[SEG.length - 1]; return d + s - a; };
+
+// ---- utils ----
+const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const pr = (t, a, d) => cl((t - a) / d);
+const eo = (x) => 1 - Math.pow(1 - x, 3), eio = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const lerp = (a, b, p) => a + (b - a) * p;
+const AR = /[؀-ۿ]/;
+function rng(s) { return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+function T(s, x, y, o = {}) {
+  ctx.save();
+  ctx.font = `${o.w || 700} ${o.s || 40}px ${o.f || (AR.test(s) ? 'Cairo' : 'Montserrat')}`;
+  ctx.fillStyle = o.c || C.white; ctx.globalAlpha *= (o.a ?? 1);
+  ctx.textAlign = o.al || 'right'; ctx.textBaseline = o.bl || 'middle';
+  ctx.direction = AR.test(s) && !o.ltr ? 'rtl' : 'ltr';
+  if (o.ls) ctx.letterSpacing = o.ls + 'px';
+  ctx.fillText(s, x, y); const w = ctx.measureText(s).width; ctx.restore(); return w;
+}
+function TW(s, o = {}) { ctx.save(); ctx.font = `${o.w || 700} ${o.s || 40}px ${o.f || (AR.test(s) ? 'Cairo' : 'Montserrat')}`; if (o.ls) ctx.letterSpacing = o.ls + 'px'; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+function RR(x, y, w, h, r, fill, stroke, lw = 2) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+function shadow(b = 30, y = 12, c = 'rgba(5,12,25,0.35)') { ctx.shadowColor = c; ctx.shadowBlur = b; ctx.shadowOffsetY = y; }
+function noShadow() { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; }
+function dia(cx, cy, s, fill, stroke, lw = 2) { ctx.beginPath(); ctx.moveTo(cx, cy - s); ctx.lineTo(cx + s, cy); ctx.lineTo(cx, cy + s); ctx.lineTo(cx - s, cy); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+// pop-in helper: returns {a, y, s}
+function pop(t, t0, d = 0.45, dy = 26) { const p = pr(t, t0, d); return { a: eo(p), y: (1 - eo(p)) * dy, s: lerp(0.92, 1, back(p)), p }; }
+function withA(a, fn) { if (a <= 0.001) return; ctx.save(); ctx.globalAlpha *= a; fn(); ctx.restore(); }
+
+// ---- brand pieces ----
+function logo(cx, cy, s, o = {}) {
+  const b = o.build ?? 1, glow = o.glow ?? 0;
+  ctx.save();
+  if (glow > 0) { const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 2.2); g.addColorStop(0, `rgba(85,214,230,${0.35 * glow})`); g.addColorStop(1, 'rgba(85,214,230,0)'); ctx.fillStyle = g; ctx.fillRect(cx - s * 2.5, cy - s * 2.5, s * 5, s * 5); }
+  // four facets flying in
+  const facets = [[[0, -1], [1, 0], [0, 0], '#13A0B0', [1, -1]], [[1, 0], [0, 1], [0, 0], '#0E8696', [1, 1]], [[0, 1], [-1, 0], [0, 0], '#0A6371', [-1, 1]], [[-1, 0], [0, -1], [0, 0], '#0F7A89', [-1, -1]]];
+  facets.forEach(([p1, p2, p3, col, dir], i) => {
+    const q = eo(cl(b * 1.6 - i * 0.2)); const off = (1 - q) * s * 2.2, rot = (1 - q) * (i % 2 ? 0.8 : -0.8);
+    ctx.save(); ctx.globalAlpha *= q; ctx.translate(cx + dir[0] * off, cy + dir[1] * off); ctx.rotate(rot);
+    ctx.beginPath(); ctx.moveTo(p1[0] * s, p1[1] * s); ctx.lineTo(p2[0] * s, p2[1] * s); ctx.lineTo(p3[0] * s, p3[1] * s); ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+    ctx.restore();
+  });
+  const q2 = eo(pr(b, 0.6, 0.4));
+  withA(q2, () => { dia(cx, cy, s * 0.6, null, 'rgba(120,225,236,0.55)', Math.max(1.5, s * 0.018)); });
+  const q3 = back(pr(b, 0.75, 0.25));
+  if (q3 > 0) dia(cx + s * 0.3, cy + s * 0.36, s * 0.32 * q3, C.cyan);
+  ctx.restore();
+}
+function wordmark(xr, y, s, a = 1) { // right-aligned "◆ TwinAI" like the PDF header
+  withA(a, () => { dia(xr - s * 0.32, y, s * 0.3, C.cyan); T('TwinAI', xr - s * 0.85, y + s * 0.04, { s, w: 600, f: 'Montserrat', al: 'right' }); });
+}
+function bg(t, o = {}) {
+  ctx.fillStyle = o.dark ? '#070D18' : C.bg; ctx.fillRect(0, 0, W, H);
+  const k = o.dark ? 0.55 : 1;
+  let g = ctx.createRadialGradient(260 + Math.sin(t * 0.2) * 40, 90, 0, 260, 90, 950); g.addColorStop(0, `rgba(22,62,104,${0.6 * k})`); g.addColorStop(1, 'rgba(22,62,104,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  g = ctx.createRadialGradient(220, 1040, 0, 220, 1040, 720); g.addColorStop(0, `rgba(14,108,116,${0.55 * k})`); g.addColorStop(1, 'rgba(14,108,116,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  g = ctx.createRadialGradient(1750, 900, 0, 1750, 900, 600); g.addColorStop(0, `rgba(30,60,110,${0.25 * k})`); g.addColorStop(1, 'rgba(30,60,110,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // faint dot grid
+  ctx.fillStyle = 'rgba(140,170,210,0.06)';
+  for (let x = 40; x < W; x += 48) for (let y = 40; y < H; y += 48) ctx.fillRect(x, y, 2, 2);
+}
+function eyebrow(s, xr, y, a = 1) { T(s, xr, y, { s: 30, w: 700, c: C.cyan, a }); }
+
+// ---- icons (line style) ----
+function icon(kind, cx, cy, s, col, lw = 3) {
+  ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const u = s / 2;
+  if (kind === 'chat') { ctx.beginPath(); ctx.roundRect(cx - u, cy - u * 0.8, u * 2, u * 1.4, u * 0.35); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u * 0.4, cy + u * 0.6); ctx.lineTo(cx - u * 0.7, cy + u); ctx.lineTo(cx - u * 0.05, cy + u * 0.6); ctx.stroke(); for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.arc(cx + i * u * 0.45, cy - u * 0.1, lw * 0.6, 0, 7); ctx.fill(); } }
+  else if (kind === 'bot') { ctx.beginPath(); ctx.roundRect(cx - u * 0.85, cy - u * 0.5, u * 1.7, u * 1.3, u * 0.35); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx, cy - u * 0.5); ctx.lineTo(cx, cy - u * 0.9); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy - u * 0.98, lw, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(cx - u * 0.38, cy + u * 0.1, lw * 1.1, 0, 7); ctx.arc(cx + u * 0.38, cy + u * 0.1, lw * 1.1, 0, 7); ctx.fill(); }
+  else if (kind === 'device') { ctx.beginPath(); ctx.roundRect(cx - u * 0.55, cy - u, u * 1.1, u * 2, u * 0.2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u * 0.15, cy + u * 0.72); ctx.lineTo(cx + u * 0.15, cy + u * 0.72); ctx.stroke(); }
+  else if (kind === 'call') { ctx.translate(cx, cy); ctx.rotate(-Math.PI / 4); ctx.lineWidth = Math.max(lw, u * 0.28); ctx.beginPath(); ctx.arc(0, 0, u * 0.62, Math.PI * 0.72, Math.PI * 1.28); ctx.stroke(); for (const a of [0.7, 1.3]) { ctx.beginPath(); ctx.ellipse(Math.cos(Math.PI * a) * u * 0.62, Math.sin(Math.PI * a) * u * 0.62, u * 0.2, u * 0.3, Math.PI * a + Math.PI / 2, 0, 7); ctx.fill(); } }
+  else if (kind === 'alert') { ctx.beginPath(); ctx.moveTo(cx, cy - u); ctx.lineTo(cx + u, cy + u * 0.8); ctx.lineTo(cx - u, cy + u * 0.8); ctx.closePath(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx, cy - u * 0.3); ctx.lineTo(cx, cy + u * 0.2); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + u * 0.5, lw * 0.7, 0, 7); ctx.fill(); }
+  else if (kind === 'cal') { ctx.beginPath(); ctx.roundRect(cx - u, cy - u * 0.75, u * 2, u * 1.75, u * 0.2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u, cy - u * 0.25); ctx.lineTo(cx + u, cy - u * 0.25); ctx.stroke(); for (const dx of [-0.45, 0.45]) { ctx.beginPath(); ctx.moveTo(cx + dx * u, cy - u); ctx.lineTo(cx + dx * u, cy - u * 0.55); ctx.stroke(); } for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { ctx.fillRect(cx - u * 0.55 + i * u * 0.5, cy + u * 0.1 + j * u * 0.4, lw, lw); } }
+  else if (kind === 'branch') { const pts = [[0, -0.7], [-0.75, 0.6], [0.75, 0.6]]; ctx.beginPath(); ctx.moveTo(cx, cy - u * 0.7); ctx.lineTo(cx - u * 0.75, cy + u * 0.6); ctx.moveTo(cx, cy - u * 0.7); ctx.lineTo(cx + u * 0.75, cy + u * 0.6); ctx.stroke(); for (const [a, b] of pts) { ctx.beginPath(); ctx.arc(cx + a * u, cy + b * u, u * 0.28, 0, 7); ctx.fill(); } }
+  else if (kind === 'chart') { [[-0.7, 0.3], [-0.1, -0.3], [0.5, -0.8]].forEach(([x, top]) => { ctx.fillRect(cx + x * u, cy + top * u, u * 0.4, (1 - top) * u - u * 0.1); }); }
+  else if (kind === 'shield') { ctx.beginPath(); ctx.moveTo(cx, cy - u); ctx.lineTo(cx + u * 0.85, cy - u * 0.6); ctx.lineTo(cx + u * 0.8, cy + u * 0.1); ctx.quadraticCurveTo(cx + u * 0.6, cy + u * 0.75, cx, cy + u); ctx.quadraticCurveTo(cx - u * 0.6, cy + u * 0.75, cx - u * 0.8, cy + u * 0.1); ctx.lineTo(cx - u * 0.85, cy - u * 0.6); ctx.closePath(); ctx.stroke(); }
+  else if (kind === 'check') { ctx.beginPath(); ctx.moveTo(cx - u * 0.6, cy); ctx.lineTo(cx - u * 0.15, cy + u * 0.45); ctx.lineTo(cx + u * 0.65, cy - u * 0.45); ctx.stroke(); }
+  else if (kind === 'bell') { ctx.beginPath(); ctx.moveTo(cx - u * 0.75, cy + u * 0.5); ctx.quadraticCurveTo(cx - u * 0.6, cy + u * 0.3, cx - u * 0.6, cy - u * 0.1); ctx.arc(cx, cy - u * 0.1, u * 0.6, Math.PI, 0); ctx.quadraticCurveTo(cx + u * 0.6, cy + u * 0.3, cx + u * 0.75, cy + u * 0.5); ctx.closePath(); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + u * 0.72, u * 0.16, 0, 7); ctx.fill(); }
+  else if (kind === 'globe') { ctx.beginPath(); ctx.arc(cx, cy, u * 0.9, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.ellipse(cx, cy, u * 0.4, u * 0.9, 0, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u * 0.9, cy); ctx.lineTo(cx + u * 0.9, cy); ctx.stroke(); }
+  else if (kind === 'lock') { ctx.beginPath(); ctx.roundRect(cx - u * 0.7, cy - u * 0.1, u * 1.4, u * 1.05, u * 0.15); ctx.fill(); ctx.beginPath(); ctx.arc(cx, cy - u * 0.15, u * 0.45, Math.PI, 0); ctx.stroke(); }
+  else if (kind === 'star') { star(cx, cy, u, col); }
+  else if (kind === 'moon') { ctx.beginPath(); ctx.arc(cx, cy, u * 0.8, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(cx + u * 0.4, cy - u * 0.3, u * 0.7, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+function star(cx, cy, r, col, stroke) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } ctx.closePath(); if (stroke) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); } else { ctx.fillStyle = col; ctx.fill(); } }
+function waIcon(cx, cy, r) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = C.green; ctx.fill(); icon('call', cx + r * 0.05, cy + r * 0.05, r * 1.0, '#fff', Math.max(1.5, r * 0.12)); }
+
+// ---- phone mockup ----
+function phone(cx, cy, w, h, fn, o = {}) {
+  ctx.save(); shadow(60, 24, 'rgba(0,0,0,0.5)');
+  RR(cx - w / 2, cy - h / 2, w, h, w * 0.13, '#05080F'); noShadow();
+  RR(cx - w / 2, cy - h / 2, w, h, w * 0.13, null, '#2B3B57', 3);
+  const ix = cx - w / 2 + 12, iy = cy - h / 2 + 12, iw = w - 24, ih = h - 24;
+  ctx.save(); ctx.beginPath(); ctx.roundRect(ix, iy, iw, ih, w * 0.11); ctx.clip(); fn(ix, iy, iw, ih); ctx.restore();
+  RR(cx - w * 0.15, iy + 12, w * 0.3, 26, 13, '#05080F');
+  ctx.restore();
+}
+function notif(x, y, w, title, body, time, a = 1, o = {}) { // phone-style notification card (x,y = top-left)
+  withA(a, () => {
+    ctx.save(); shadow(20, 8, 'rgba(0,0,0,0.25)'); RR(x, y, w, o.h || 108, 22, o.bg || 'rgba(245,248,252,0.96)'); noShadow(); ctx.restore();
+    waIcon(x + w - 40, y + 38, 20);
+    T(title, x + w - 72, y + 36, { s: 22, w: 800, c: C.ink, f: 'Tajawal' });
+    T(time, x + 20, y + 36, { s: 18, w: 500, c: C.mut2, al: 'left', f: 'Tajawal' });
+    T(body, x + w - 24, y + 74, { s: 22, w: 500, c: C.ink2, f: 'Tajawal' });
+  });
+}
+
+function card(x, y, w, h, o = {}) { ctx.save(); shadow(o.sb ?? 24, 8, 'rgba(15,27,46,0.10)'); RR(x, y, w, h, o.r || 20, o.bg || C.card); noShadow(); if (o.stroke) RR(x, y, w, h, o.r || 20, null, o.stroke, 2); ctx.restore(); }
+function chip(xr, y, s, bgc, fg, o = {}) { const w = TW(s, { s: o.s || 20, w: 700, f: 'Tajawal' }) + 32; RR(xr - w, y - 18, w, 36, 18, bgc); T(s, xr - 16, y + 1, { s: o.s || 20, w: 700, c: fg, f: 'Tajawal' }); return w; }
+function wrap(s, xr, y, maxw, lh, o) { const words = s.split(' '); let line = '', yy = y; for (const w of words) { const test = line ? line + ' ' + w : w; if (TW(test, o) > maxw && line) { T(line, xr, yy, o); line = w; yy += lh; } else line = test; } if (line) T(line, xr, yy, o); }
+// ================= ASSETS =================
+const IMG = {}; const LOGO_AR = 1182 / 943;
+function athir(cx, cy, h, a = 1) { const im = IMG.athir; if (!im) return; withA(a, () => ctx.drawImage(im, cx - h * LOGO_AR / 2, cy - h / 2, h * LOGO_AR, h)); }
+
+// drawn phone product (no brand marks)
+function prodPhone(cx, cy, h, ca, cb, o = {}) {
+  const w = h * 0.49; ctx.save(); ctx.translate(cx, cy); if (o.rot) ctx.rotate(o.rot);
+  ctx.save(); shadow(h * 0.12, h * 0.05, 'rgba(10,30,60,0.28)');
+  const g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2); g.addColorStop(0, ca); g.addColorStop(1, cb);
+  RR(-w / 2, -h / 2, w, h, w * 0.18, g); noShadow(); ctx.restore();
+  RR(-w / 2 + 2, -h / 2 + 2, w - 4, h - 4, w * 0.17, null, 'rgba(255,255,255,0.35)', 1.5);
+  const m = w * 0.46; RR(-w / 2 + w * 0.08, -h / 2 + w * 0.08, m, m, m * 0.28, 'rgba(255,255,255,0.18)', 'rgba(0,0,0,0.12)', 1);
+  [[0.3, 0.3], [0.3, 0.72], [0.72, 0.5]].forEach(([u, v]) => { const x = -w / 2 + w * 0.08 + m * u, y = -h / 2 + w * 0.08 + m * v; ctx.beginPath(); ctx.arc(x, y, m * 0.17, 0, 7); ctx.fillStyle = '#1B1F27'; ctx.fill(); ctx.beginPath(); ctx.arc(x - m * 0.04, y - m * 0.04, m * 0.05, 0, 7); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill(); });
+  const sh = ctx.createLinearGradient(-w / 2, 0, w / 2, 0); sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.5, 'rgba(255,255,255,0.18)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.globalCompositeOperation = 'source-atop'; ctx.fillStyle = sh; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.restore();
+}
+const PRODS = [['iPhone 15 Pro', '256GB', '#8A857C', '#46433E', 0], ['Galaxy S24 Ultra', '512GB', '#3A3F4C', '#6B7183', 0], ['iPhone 13', 'مستعمل مفحوص', '#D9C9E6', '#A08ABF', 1], ['Redmi Note 13', '256GB', '#A6DCEB', '#4F9DB8', 0],
+  ['Galaxy A55', '128GB', '#CBE8D7', '#6FAE8E', 0], ['iPhone 14', 'مستعمل مفحوص', '#F3D5DB', '#D597A6', 1], ['Pixel 8', '128GB', '#EFE9DC', '#B5AA95', 0], ['iPhone 15', '128GB', '#C3DBF2', '#6C9BCB', 0]];
+const CATS = [['new', 'جوالات جديدة'], ['used', 'مستعملة مفحوصة'], ['audio', 'ساعات وسماعات'], ['charge', 'شواحن وكيابل'], ['case', 'كفرات وحماية'], ['fix', 'خدمات الصيانة']];
+function catIcon(k, cx, cy, s, col, lw = 2.5) {
+  ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const u = s / 2;
+  if (k === 'new' || k === 'used') { ctx.beginPath(); ctx.roundRect(cx - u * 0.5, cy - u * 0.9, u, u * 1.8, u * 0.18); ctx.stroke(); if (k === 'new') { ctx.beginPath(); ctx.moveTo(cx + u * 0.75, cy - u * 0.95); ctx.lineTo(cx + u * 0.75, cy - u * 0.45); ctx.moveTo(cx + u * 0.5, cy - u * 0.7); ctx.lineTo(cx + u, cy - u * 0.7); ctx.stroke(); } else { ctx.beginPath(); ctx.moveTo(cx - u * 0.25, cy); ctx.lineTo(cx - u * 0.05, cy + u * 0.22); ctx.lineTo(cx + u * 0.28, cy - u * 0.2); ctx.stroke(); } }
+  else if (k === 'audio') { ctx.beginPath(); ctx.arc(cx, cy, u * 0.7, Math.PI, 0); ctx.stroke(); ctx.beginPath(); ctx.roundRect(cx - u * 0.85, cy - u * 0.05, u * 0.38, u * 0.75, u * 0.12); ctx.roundRect(cx + u * 0.47, cy - u * 0.05, u * 0.38, u * 0.75, u * 0.12); ctx.fill(); }
+  else if (k === 'charge') { ctx.beginPath(); ctx.moveTo(cx + u * 0.15, cy - u * 0.9); ctx.lineTo(cx - u * 0.45, cy + u * 0.1); ctx.lineTo(cx + u * 0.05, cy + u * 0.1); ctx.lineTo(cx - u * 0.15, cy + u * 0.9); ctx.lineTo(cx + u * 0.45, cy - u * 0.1); ctx.lineTo(cx - u * 0.05, cy - u * 0.1); ctx.closePath(); ctx.fill(); }
+  else if (k === 'case') { icon('shield', cx, cy, s * 0.9, col, lw); }
+  else if (k === 'fix') { ctx.beginPath(); ctx.moveTo(cx - u * 0.6, cy + u * 0.6); ctx.lineTo(cx + u * 0.2, cy - u * 0.2); ctx.stroke(); ctx.beginPath(); ctx.arc(cx + u * 0.38, cy - u * 0.38, u * 0.38, Math.PI * 0.25, Math.PI * 2.0); ctx.stroke(); }
+  ctx.restore();
+}
+function browser(x, y, w, h, url, fn) {
+  ctx.save(); shadow(60, 24, 'rgba(0,0,0,0.45)'); RR(x, y, w, h, 18, '#fff'); noShadow();
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 18); ctx.clip();
+  ctx.fillStyle = '#E9EDF2'; ctx.fillRect(x, y, w, 46); [['#FF5F57', 0], ['#FEBC2E', 1], ['#28C840', 2]].forEach(([c, i]) => { ctx.beginPath(); ctx.arc(x + 26 + i * 22, y + 23, 7, 0, 7); ctx.fillStyle = c; ctx.fill(); });
+  RR(x + w / 2 - 240, y + 9, 480, 28, 14, '#fff'); icon('lock', x + w / 2 - 210, y + 24, 14, '#6B7A90', 2); T(url, x + w / 2 - 190, y + 24, { s: 15, w: 500, c: '#45536A', al: 'left' });
+  ctx.translate(x, y + 46); fn(w, h - 46); ctx.restore();
+}
+// desktop store page in local coords (pw x ph); o.hl = highlighted category idx list, o.scroll
+function storePage(t, pw, ph, o = {}) {
+  ctx.fillStyle = '#F6F9FB'; ctx.fillRect(0, 0, pw, ph);
+  ctx.save(); ctx.translate(0, -(o.scroll || 0));
+  ctx.fillStyle = A.deep; ctx.fillRect(0, 0, pw, 34); T('توصيل نفس اليوم داخل الرياض  ·  تقسيط متاح  ·  استلام من الفرع', pw / 2, 18, { s: 15, w: 700, c: '#fff', al: 'center', f: 'Tajawal' });
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 34, pw, 92);
+  athir(pw - 70, 80, 74);
+  RR(pw / 2 - 250, 58, 400, 44, 22, '#F1F5F8', '#DCE5EC', 1.5); T('ابحث عن جوال، إكسسوار، أو خدمة صيانة…', pw / 2 + 130, 80, { s: 15, w: 500, c: '#8592A6', f: 'Tajawal' });
+  icon('globe', pw / 2 + 125 + 6, 80, 0, '#fff');
+  // cart
+  ctx.save(); ctx.strokeStyle = A.deep; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(40, 66); ctx.lineTo(50, 66); ctx.lineTo(57, 92); ctx.lineTo(82, 92); ctx.lineTo(88, 72); ctx.lineTo(53, 72); ctx.stroke(); ctx.beginPath(); ctx.arc(60, 99, 3, 0, 7); ctx.arc(80, 99, 3, 0, 7); ctx.fillStyle = A.deep; ctx.fill(); ctx.restore();
+  const cartN = o.cart || 0; if (cartN) { const b = back(pr(t, o.cartT || 0, 0.35)); ctx.beginPath(); ctx.arc(88, 62, 11 * b, 0, 7); ctx.fillStyle = A.royal; ctx.fill(); T(String(cartN), 88, 63, { s: 13, w: 600, c: '#fff', al: 'center' }); }
+  T('حسابي', 150, 80, { s: 16, w: 700, c: A.deep, f: 'Tajawal' });
+  // nav
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 126, pw, 50); ctx.fillStyle = '#E4EAF0'; ctx.fillRect(0, 175, pw, 1.5);
+  let nx = pw - 40; CATS.forEach(([k, n], i) => { const on = (o.hl || []).includes(i); const w = TW(n, { s: 17, w: 700, f: 'Tajawal' });
+    T(n, nx, 151, { s: 17, w: on ? 800 : 600, c: on ? A.royal : A.deep, f: 'Tajawal' }); if (on) { ctx.fillStyle = A.cyan; ctx.fillRect(nx - w, 168, w, 4); } nx -= w + 38; });
+  // hero
+  const hx = 24, hy = 194, hw = pw - 48, hh = 280; const g = ctx.createLinearGradient(hx, 0, hx + hw, 0); g.addColorStop(0, A.royal); g.addColorStop(1, '#22C3D6');
+  RR(hx, hy, hw, hh, 20, g);
+  ctx.save(); ctx.beginPath(); ctx.roundRect(hx, hy, hw, hh, 20); ctx.clip(); ctx.globalAlpha = 0.12; dia(hx + 260, hy + 140, 260, '#fff'); ctx.globalAlpha = 1; ctx.restore();
+  T('عروض الأسبوع', hx + hw - 50, hy + 80, { s: 46, w: 900, c: '#fff' }); T('أجهزة جديدة ومستعملة مفحوصة · تقسيط · توصيل سريع', hx + hw - 50, hy + 140, { s: 20, w: 500, c: '#E8FBFC', f: 'Tajawal' });
+  RR(hx + hw - 230, hy + 180, 180, 52, 26, '#fff'); T('تسوّق الآن', hx + hw - 140, hy + 207, { s: 20, w: 800, c: A.royal, al: 'center', f: 'Tajawal' });
+  prodPhone(hx + 250, hy + 150, 210, '#8A857C', '#46433E', { rot: -0.18 }); prodPhone(hx + 390, hy + 150, 190, '#C3DBF2', '#6C9BCB', { rot: 0.12 });
+  // categories row
+  const cy = hy + hh + 70, cw = (pw - 48) / 6;
+  CATS.forEach(([k, n], i) => { const on = (o.hl || []).includes(i); const x = pw - 24 - cw * i - cw / 2;
+    ctx.beginPath(); ctx.arc(x, cy, 40, 0, 7); ctx.fillStyle = on ? A.royal : A.sky; ctx.fill(); if (on) { ctx.lineWidth = 4; ctx.strokeStyle = A.cyan; ctx.stroke(); }
+    catIcon(k, x, cy, 36, on ? '#fff' : A.blue); T(n, x, cy + 66, { s: 17, w: on ? 800 : 600, c: A.deep, al: 'center', f: 'Tajawal' }); });
+  // products
+  const rows = [['وصل حديثاً', 0], ['الأكثر مبيعاً', 4]];
+  rows.forEach(([title, off], r) => { const ty = cy + 140 + r * 400; T(title, pw - 40, ty, { s: 26, w: 800, c: A.deep }); T('عرض الكل ←', 40, ty, { s: 16, w: 700, c: A.royal, al: 'left', f: 'Tajawal' });
+    const gw = (pw - 48 - 3 * 20) / 4; for (let i = 0; i < 4; i++) { const p = PRODS[off + i], x = pw - 24 - (i + 1) * gw - i * 20, y = ty + 30;
+      RR(x, y, gw, 330, 18, '#fff', '#E4EAF0', 1.5); RR(x + 12, y + 12, gw - 24, 170, 12, '#F2F6F9'); prodPhone(x + gw / 2, y + 98, 140, p[2], p[3]);
+      if (p[4]) chip(x + gw - 18, y + 32, 'مستعمل مفحوص', '#E6FAF0', '#178A55', { s: 13 });
+      T(p[0], x + gw - 18, y + 214, { s: 18, w: 600, c: A.deep, al: 'right' }); T(p[4] ? 'ضمان + فحص شامل' : p[1], x + gw - 18, y + 242, { s: 15, w: 500, c: '#7A889C', al: 'right', f: p[4] ? 'Tajawal' : 'Montserrat' });
+      T('تقسيط متاح', x + gw - 18, y + 270, { s: 14, w: 700, c: '#178A55', f: 'Tajawal' });
+      RR(x + 14, y + 288, gw - 28, 32, 16, A.royal); T('أضف للسلة', x + gw / 2, y + 304, { s: 15, w: 800, c: '#fff', al: 'center', f: 'Tajawal' }); } });
+  ctx.restore();
+}
+// mobile store screen in local coords (w x h)
+function storeMobile(t, w, h, o = {}) {
+  ctx.fillStyle = '#F6F9FB'; ctx.fillRect(0, 0, w, h);
+  ctx.save(); ctx.translate(0, -(o.scroll || 0));
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, 130); athir(w / 2, 84, 62);
+  icon('chat', 34, 84, 0, '#fff');
+  RR(16, 140, w - 32, 40, 20, '#fff', '#DCE5EC', 1.5); T('ابحث في المتجر…', w - 34, 160, { s: 14, w: 500, c: '#8592A6', f: 'Tajawal' });
+  const g = ctx.createLinearGradient(0, 0, w, 0); g.addColorStop(0, A.royal); g.addColorStop(1, '#22C3D6'); RR(16, 194, w - 32, 150, 16, g);
+  T('عروض الأسبوع', w - 34, 236, { s: 22, w: 900, c: '#fff' }); T('تقسيط · توصيل سريع', w - 34, 268, { s: 13, w: 500, c: '#E8FBFC', f: 'Tajawal' });
+  RR(w - 130, 290, 96, 34, 17, '#fff'); T('تسوّق', w - 82, 307, { s: 14, w: 800, c: A.royal, al: 'center', f: 'Tajawal' });
+  prodPhone(80, 270, 110, '#8A857C', '#46433E', { rot: -0.15 });
+  const cw = (w - 32) / 3; CATS.forEach(([k, n], i) => { const on = (o.hl || []).includes(i), x = w - 16 - cw * (i % 3) - cw / 2, y = 392 + Math.floor(i / 3) * 96;
+    ctx.beginPath(); ctx.arc(x, y, 28, 0, 7); ctx.fillStyle = on ? A.royal : A.sky; ctx.fill(); catIcon(k, x, y, 26, on ? '#fff' : A.blue, 2); T(n, x, y + 46, { s: 12, w: 700, c: A.deep, al: 'center', f: 'Tajawal' }); });
+  const gw = (w - 44) / 2; for (let i = 0; i < 4; i++) { const p = PRODS[i], x = w - 16 - (i % 2 + 1) * gw - (i % 2) * 12, y = 600 + Math.floor(i / 2) * 230;
+    RR(x, y, gw, 216, 14, '#fff', '#E4EAF0', 1.2); RR(x + 8, y + 8, gw - 16, 110, 10, '#F2F6F9'); prodPhone(x + gw / 2, y + 63, 92, p[2], p[3]);
+    T(p[0], x + gw - 12, y + 140, { s: 13, w: 600, c: A.deep }); T('تقسيط متاح', x + gw - 12, y + 162, { s: 11, w: 700, c: '#178A55', f: 'Tajawal' });
+    RR(x + 10, y + 178, gw - 20, 28, 14, A.royal); T('أضف للسلة', x + gw / 2, y + 192, { s: 12, w: 800, c: '#fff', al: 'center', f: 'Tajawal' }); }
+  ctx.restore();
+}
+
+// ================= SCENES =================
+// S1 — Google-maps style hook
+function mapBg(t, cam) {
+  ctx.fillStyle = '#0A1626'; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.translate(960, 560); ctx.scale(cam, cam); ctx.translate(-960, -560);
+  const r = rng(21);
+  ctx.fillStyle = 'rgba(40,80,120,0.16)'; for (let i = 0; i < 140; i++) { const x = r() * 2400 - 240, y = r() * 1400 - 160; RR(x, y, 60 + r() * 120, 40 + r() * 90, 8, 'rgba(40,80,120,0.13)'); }
+  ctx.strokeStyle = 'rgba(85,214,230,0.10)'; ctx.lineWidth = 3; for (let i = 0; i < 26; i++) { ctx.beginPath(); const y = r() * 1300 - 100; ctx.moveTo(-200, y); ctx.bezierCurveTo(600, y + (r() - 0.5) * 300, 1300, y + (r() - 0.5) * 300, 2200, y + (r() - 0.5) * 200); ctx.stroke(); }
+  for (let i = 0; i < 20; i++) { ctx.beginPath(); const x = r() * 2200 - 100; ctx.moveTo(x, -100); ctx.bezierCurveTo(x + (r() - 0.5) * 300, 400, x + (r() - 0.5) * 300, 800, x + (r() - 0.5) * 200, 1300); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(85,214,230,0.28)'; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(-100, 760); ctx.bezierCurveTo(500, 700, 1200, 820, 2100, 640); ctx.stroke(); ctx.beginPath(); ctx.moveTo(1180, -100); ctx.bezierCurveTo(1100, 400, 1250, 700, 1150, 1300); ctx.stroke();
+  T('المنفوحة', 760, 470, { s: 30, w: 700, c: 'rgba(160,200,230,0.45)', f: 'Tajawal', al: 'center' }); T('الرياض', 1500, 260, { s: 34, w: 700, c: 'rgba(160,200,230,0.3)', f: 'Tajawal', al: 'center' });
+  ctx.restore();
+}
+function pin(x, y, s, col, a = 1) { withA(a, () => { ctx.save(); ctx.translate(x, y); shadow(20, 8, 'rgba(0,0,0,0.4)'); ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(-s * 0.9, -s * 1.1, -s * 0.75, -s * 2.1, 0, -s * 2.1); ctx.bezierCurveTo(s * 0.75, -s * 2.1, s * 0.9, -s * 1.1, 0, 0); ctx.fillStyle = col; ctx.fill(); noShadow(); ctx.beginPath(); ctx.arc(0, -s * 1.38, s * 0.32, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore(); }); }
+function s1(t) {
+  const cam = 1 + 0.12 * eio(pr(t, 0, 7));
+  mapBg(t, cam);
+  ctx.save(); ctx.translate(960, 560); ctx.scale(cam, cam); ctx.translate(-960, -560);
+  const pd = pr(t, 0.4, 0.6); const py = lerp(380, 600, eo(pd));
+  if (pd > 0) { const rp = pr(t, 1.0, 1.2); ctx.save(); ctx.globalAlpha = 1 - rp; ctx.strokeStyle = A.cyan; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(700, 600, 30 + rp * 90, (30 + rp * 90) * 0.35, 0, 0, 7); ctx.stroke(); ctx.restore(); pin(700, py, 34, '#E5484D', eo(pd)); }
+  pin(880, 690, 22, '#E5484D', eo(pr(t, 1.4, 0.5)) * 0.85);
+  ctx.restore();
+  // info card
+  const cp = pop(t, V(0.07), 0.55, 30);
+  withA(cp.a, () => { ctx.save(); ctx.translate(0, cp.y); const x = 820, y = 300, w = 760, h = 330; shadow(40, 16, 'rgba(0,0,0,0.45)'); RR(x, y, w, h, 26, '#fff'); noShadow();
+    RR(x + w - 200, y + 30, 170, 136, 18, '#fff', '#E4EAF0', 1.5); athir(x + w - 115, y + 98, 116);
+    T('الأثير الماسي لبيع الجوالات', x + w - 228, y + 64, { s: 32, w: 800, c: A.deep }); T('محل جوالات وصيانة · المنفوحة، الرياض', x + w - 228, y + 108, { s: 20, w: 500, c: '#6B7A90', f: 'Tajawal' });
+    const rv = lerp(0, 4.8, eo(pr(t, V(0.07), V(1.64) - V(0.07)))); T(rv.toFixed(1), x + w - 228, y + 172, { s: 56, w: 600, c: A.deep, al: 'right' });
+    for (let i = 0; i < 5; i++) { const sp = back(pr(t, V(0.4) + i * 0.12, 0.3)); if (sp > 0) star(x + w - 352 - i * 44, y + 170, 18 * sp, '#F5B400'); }
+    const nr = Math.round(lerp(0, 50, eo(pr(t, V(3.04), 1.1)))); withA(eo(pr(t, V(3.04), 0.3)), () => T(`(+${nr} تقييم)`, x + w - 590, y + 172, { s: 22, w: 700, c: '#6B7A90', f: 'Tajawal' }));
+    ctx.fillStyle = '#E4EAF0'; ctx.fillRect(x + 30, y + 222, w - 60, 1.5);
+    T('مفتوح حتى 12 منتصف الليل · فرعين في المنفوحة', x + w - 30, y + 270, { s: 21, w: 700, c: '#178A55', f: 'Tajawal' });
+    const sp = pop(t, V(5.12), 0.45, 0); withA(sp.a, () => { ctx.save(); ctx.translate(x + 150, y + 270); ctx.scale(sp.s, sp.s); RR(-120, -24, 240, 48, 24, '#FFF4D6'); T('سمعة ممتازة ★', 0, 1, { s: 20, w: 800, c: '#A06A00', al: 'center', f: 'Tajawal' }); ctx.restore(); });
+    ctx.restore(); });
+  // "where is your online store?"
+  const q = pr(t, V(7.2) - 0.2, 0.5);
+  if (q > 0) { ctx.fillStyle = `rgba(7,13,24,${0.78 * eo(q)})`; ctx.fillRect(0, 0, W, H);
+    withA(eo(q), () => { const bw = 900, bx = 960 - bw / 2, by = 430; shadow(40, 14, 'rgba(0,0,0,0.5)'); RR(bx, by, bw, 92, 46, '#fff'); noShadow();
+      const full = 'متجر الأثير الماسي أونلاين'; const n = Math.floor(full.length * cl((t - V(7.4)) / 0.9)); const txt = full.slice(0, n);
+      T(txt + ((t * 2) % 1 < 0.5 ? '|' : ''), bx + bw - 90, by + 47, { s: 32, w: 600, c: A.deep, f: 'Tajawal' });
+      ctx.beginPath(); ctx.arc(bx + bw - 48, by + 44, 14, 0, 7); ctx.strokeStyle = '#6B7A90'; ctx.lineWidth = 3; ctx.stroke(); ctx.beginPath(); ctx.moveTo(bx + bw - 38, by + 54); ctx.lineTo(bx + bw - 28, by + 64); ctx.stroke();
+      const rp = pop(t, V(8.4), 0.45, 16); withA(rp.a, () => { RR(bx, by + 120 + rp.y, bw, 130, 24, 'rgba(255,255,255,0.06)', 'rgba(229,86,107,0.6)', 2); T('لا يوجد متجر إلكتروني', 960, by + 168 + rp.y, { s: 36, w: 800, c: '#FF8A9A', al: 'center' }); T('ولا موقع رسمي للطلب أونلاين', 960, by + 214 + rp.y, { s: 22, w: 500, c: C.mut, al: 'center', f: 'Tajawal' }); });
+      T('؟', 960, 260, { s: 150, w: 900, c: A.cyan, al: 'center', a: eo(pr(t, V(7.7), 0.5)) }); });
+  }
+}
+// S2 — customer goes to a competitor
+function s2(t) {
+  bg(t);
+  withA(eo(pr(t, 10.5, 0.5)), () => { eyebrow('فرصة ضائعة كل يوم', 1780, 220); T('العميل يدوّر… ويشتري من غيركم', 1780, 292, { s: 58, w: 800 }); });
+  const items = [[V(9.248), 'العميل يبحث عن جهاز وسعره أونلاين'], [V(11.36), 'لا يجد الأثير الماسي في النتائج'], [V(12.24), 'يشتري من منافس يعرض منتجاته']];
+  items.forEach(([t0, s], i) => { const p = pop(t, t0, 0.5, 0), y = 440 + i * 120; withA(p.a, () => { ctx.save(); ctx.translate((1 - p.a) * 60, 0);
+    RR(1060, y - 44, 720, 88, 18, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.10)', 1.5); dia(1740, y, 12, C.amber); T(s, 1710, y + 2, { s: 31, w: 700, f: 'Tajawal' }); ctx.restore(); }); });
+  // phone with search results
+  const pp = pop(t, 10.4, 0.6, 50);
+  withA(pp.a, () => phone(520, 560 + pp.y, 400, 840, (x, y, w, h) => {
+    ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, h);
+    RR(x + 18, y + 70, w - 36, 52, 26, '#F1F5F8'); const q = 'جوالات الرياض بالتقسيط'; const n = Math.floor(q.length * cl((t - V(9.4)) / 1.0)); T(q.slice(0, n), x + w - 40, y + 96, { s: 19, w: 600, c: A.deep, f: 'Tajawal' });
+    const R = [['متجر منافس ١', 'جوالات أصلية · توصيل سريع'], ['متجر منافس ٢', 'تقسيط بدون فوائد'], ['متجر منافس ٣', 'أسعار اليوم']];
+    R.forEach(([n1, d], i) => { const p = pop(t, V(10.7) + i * 0.25, 0.4, 14); withA(p.a, () => { const yy = y + 150 + i * 160 + p.y; RR(x + 16, yy, w - 32, 144, 14, '#fff', '#E4EAF0', 1.5);
+      prodPhone(x + 70, yy + 72, 100, ['#8A857C', '#3A3F4C', '#C3DBF2'][i], ['#46433E', '#6B7183', '#6C9BCB'][i]);
+      T(n1, x + w - 34, yy + 40, { s: 20, w: 800, c: '#1A5FB4', f: 'Tajawal' }); T(d, x + w - 34, yy + 74, { s: 16, w: 500, c: '#5D6C84', f: 'Tajawal' }); RR(x + w - 160, yy + 96, 126, 32, 16, '#1A5FB4'); T('اشترِ الآن', x + w - 97, yy + 112, { s: 14, w: 800, c: '#fff', al: 'center', f: 'Tajawal' }); }); });
+    withA(eo(pr(t, V(11.36), 0.4)), () => { RR(x + 16, y + 640, w - 32, 70, 14, '#FDECEE'); T('الأثير الماسي — لا يوجد متجر', x + w / 2, y + 676, { s: 18, w: 800, c: '#C2394B', al: 'center', f: 'Tajawal' }); });
+    // tap on competitor
+    const tp = pr(t, V(12.56), 0.5); if (tp > 0) { const yy = y + 150 + 96 + 16; ctx.save(); ctx.globalAlpha = 1 - tp; ctx.beginPath(); ctx.arc(x + w - 97, yy, 20 + tp * 40, 0, 7); ctx.strokeStyle = '#E5566B'; ctx.lineWidth = 4; ctx.stroke(); ctx.restore(); }
+  }));
+}
+// S3 — reveal: shop becomes an online store
+function s3(t) {
+  bg(t);
+  const lp = pr(t, V(14.8) - 0.2, 1.0), land = V(15.2);
+  withA(1 - eo(pr(t, V(15.92) - 0.1, 0.5)), () => { logo(960, 420, 140, { build: lp, glow: 0.6 + (t > land ? Math.exp(-(t - land) * 2) : 0) }); withA(eo(pr(t, land, 0.4)), () => wordmark(1075, 640, 60)); });
+  const sp = pop(t, V(15.92), 0.7, 60);
+  withA(sp.a, () => { ctx.save(); ctx.translate(0, sp.y);
+    browser(160, 150, 1080, 700, 'www.alathir-almasi.sa', (w, h) => { ctx.save(); ctx.scale(w / 1200, w / 1200); storePage(t, 1200, h * 1200 / w); ctx.restore(); });
+    phone(1360, 560, 330, 700, (x, y, w, h) => { ctx.save(); ctx.translate(x, y); storeMobile(t, w, h); ctx.restore(); });
+    ctx.restore(); });
+  const hp = pop(t, V(17.76), 0.5, 20);
+  withA(hp.a, () => { ctx.save(); ctx.translate(0, hp.y); shadow(30, 12, 'rgba(0,0,0,0.45)'); RR(1290, 880, 520, 110, 26, C.navy, 'rgba(85,214,230,0.5)', 2); noShadow();
+    icon('moon', 1750, 935, 50, C.cyan); T('يبيع على مدار الساعة', 1700, 937, { s: 40, w: 800 }); ctx.restore(); });
+}
+// S4 — store tour
+function s4(t) {
+  bg(t);
+  const hl = []; [[V(22.56), [0]], [V(23.6), [1]], [V(24.8), [2, 3, 4]], [V(25.6), [5]]].forEach(([t0, ids]) => { if (t >= t0 && t < V(26.8)) ids.forEach((i) => hl.push(i)); });
+  const sc = 460 * eio(pr(t, V(26.9), 1.6));
+  browser(80, 70, 1180, 940, 'www.alathir-almasi.sa', (w, h) => { ctx.save(); ctx.scale(w / 1200, w / 1200); storePage(t, 1200, h * 1200 / w, { hl, scroll: sc, cart: t > V(28.28) ? 1 : 0, cartT: V(28.28) }); ctx.restore(); });
+  // right column
+  withA(eo(pr(t, 22.3, 0.5)), () => { eyebrow('واجهة المتجر', 1800, 140); T('بهوية الأثير الماسي', 1800, 205, { s: 50, w: 800 }); });
+  const sw = pop(t, V(20.04), 0.5, 16); withA(sw.a, () => { [A.cyan, A.blue, A.royal, A.deep].forEach((c, i) => { ctx.beginPath(); ctx.arc(1770 - i * 66, 290 + sw.y, 26, 0, 7); ctx.fillStyle = c; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2; ctx.stroke(); }); T('ألوانكم وشعاركم وخطوطكم', 1800, 350 + sw.y, { s: 22, w: 500, c: C.mut, f: 'Tajawal' }); });
+  const mp = pop(t, V(21.44), 0.6, 30); withA(mp.a, () => { ctx.save(); ctx.translate(0, mp.y); phone(1560, 670, 280, 560, (x, y, w, h) => { ctx.save(); ctx.translate(x, y); ctx.scale(w / 330, w / 330); storeMobile(t, 330, h * 330 / w, { hl, scroll: 140 * eio(pr(t, V(26.9), 1.6)) }); ctx.restore(); });
+    RR(1330, 960, 460, 56, 28, 'rgba(85,214,230,0.12)', 'rgba(85,214,230,0.4)', 1.5); T('مصمم للجوال أولاً — أغلب الطلبات من الجوال', 1560, 989, { s: 19, w: 700, c: C.cyan, al: 'center', f: 'Tajawal' }); ctx.restore(); });
+  // 150 counter
+  const cp = pop(t, V(27.12), 0.5, 20); withA(cp.a * (1 - pr(t, 31.6, 0.4)), () => { ctx.save(); ctx.translate(0, cp.y); shadow(40, 16, 'rgba(0,0,0,0.5)'); RR(420, 760, 500, 170, 28, C.navy, A.cyan, 2.5); noShadow();
+    const n = Math.round(lerp(0, 150, eo(pr(t, V(27.12), 1.1)))); T(String(n), 860, 845, { s: 92, w: 900, c: A.cyan, f: 'Cairo' }); T('منتج جاهز', 660, 825, { s: 34, w: 800, f: 'Cairo' }); T('بالاسم والصور والمواصفات', 660, 875, { s: 20, w: 500, c: C.mut, f: 'Tajawal' }); ctx.restore(); });
+}
+// S5 — payment & delivery
+function s5(t) {
+  bg(t);
+  withA(eo(pr(t, 32.5, 0.5)), () => { eyebrow('الدفع والتوصيل', 1800, 170); T('يدفع بسهولة… ويوصله بسرعة', 1800, 240, { s: 54, w: 800 }); });
+  const feats = [[V(29.36), 'pay', 'مدى · Apple Pay · فيزا · ماستركارد'], [V(30.59), 'split', 'تقسيط بتمارا وتابي'], [V(32.32), 'truck', 'توصيل بنفس اليوم داخل الرياض'], [V(34.44), 'store', 'أو استلام من الفرع']];
+  feats.forEach(([t0, k, s], i) => { const p = pop(t, t0, 0.45, 0), y = 380 + i * 118; withA(p.a, () => { ctx.save(); ctx.translate((1 - p.a) * 50, 0); RR(1150, y - 46, 650, 92, 20, 'rgba(255,255,255,0.05)', 'rgba(85,214,230,0.25)', 1.5);
+    ctx.beginPath(); ctx.arc(1750, y, 28, 0, 7); ctx.fillStyle = 'rgba(85,214,230,0.14)'; ctx.fill(); icon(['lock', 'chart', 'device', 'branch'][i], 1750, y, 26, A.cyan, 2.5);
+    T(s, 1700, y + 2, { s: 28, w: 700, f: 'Tajawal' }); ctx.restore(); }); });
+  // checkout phone
+  const pp = pop(t, 32.4, 0.6, 50);
+  withA(pp.a, () => phone(820, 560 + pp.y, 400, 860, (x, y, w, h) => {
+    ctx.fillStyle = '#F6F9FB'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, 110); T('إتمام الطلب', x + w / 2, y + 78, { s: 24, w: 800, c: A.deep, al: 'center' });
+    RR(x + 16, y + 126, w - 32, 96, 14, '#fff', '#E4EAF0', 1.2); prodPhone(x + 60, y + 174, 70, '#8A857C', '#46433E'); T('iPhone 15 Pro · 256GB', x + w - 34, y + 160, { s: 16, w: 600, c: A.deep }); T('الكمية: 1', x + w - 34, y + 192, { s: 14, w: 500, c: '#7A889C', f: 'Tajawal' });
+    T('طريقة الدفع', x + w - 24, y + 252, { s: 18, w: 800, c: A.deep });
+    const PM = [['مدى', V(29.36)], ['Apple Pay', V(29.76)], ['Visa · Mastercard', V(29.9)], ['تمارا — قسّمها على دفعات', V(31.12)], ['تابي — قسّمها على دفعات', V(31.68)]];
+    let sel = -1; PM.forEach(([n, t0], i) => { if (t >= t0) sel = i; });
+    PM.forEach(([n, t0], i) => { const yy = y + 276 + i * 58, on = i === sel; RR(x + 16, yy, w - 32, 48, 12, on ? '#EAF4FF' : '#fff', on ? A.royal : '#E4EAF0', on ? 2.5 : 1.2);
+      ctx.beginPath(); ctx.arc(x + w - 40, yy + 24, 9, 0, 7); ctx.strokeStyle = on ? A.royal : '#B8C3D1'; ctx.lineWidth = 2.5; ctx.stroke(); if (on) { ctx.beginPath(); ctx.arc(x + w - 40, yy + 24, 4.5, 0, 7); ctx.fillStyle = A.royal; ctx.fill(); }
+      T(n, x + w - 60, yy + 25, { s: 16, w: 700, c: A.deep, f: AR.test(n) ? 'Tajawal' : 'Montserrat' }); });
+    T('طريقة الاستلام', x + w - 24, y + 584, { s: 18, w: 800, c: A.deep });
+    const DL = [['توصيل نفس اليوم · الرياض', V(32.32)], ['استلام من الفرع · المنفوحة', V(34.44)]]; let ds = -1; DL.forEach(([n, t0], i) => { if (t >= t0) ds = i; });
+    DL.forEach(([n, t0], i) => { const yy = y + 608 + i * 58, on = i === ds; RR(x + 16, yy, w - 32, 48, 12, on ? '#E6FAF0' : '#fff', on ? '#178A55' : '#E4EAF0', on ? 2.5 : 1.2); T(n, x + w - 40, yy + 25, { s: 16, w: 700, c: A.deep, f: 'Tajawal' }); if (on) icon('check', x + 40, yy + 24, 18, '#178A55', 3); });
+    RR(x + 16, y + h - 96, w - 32, 56, 28, A.royal); T('تأكيد الطلب', x + w / 2, y + h - 67, { s: 20, w: 800, c: '#fff', al: 'center', f: 'Tajawal' });
+  }));
+  // delivery route mini-map
+  const mp = pop(t, V(32.32), 0.5, 30);
+  withA(mp.a, () => { ctx.save(); ctx.translate(0, mp.y); const x = 80, y = 300, w = 440, h = 520; ctx.save(); shadow(30, 12, 'rgba(0,0,0,0.4)'); RR(x, y, w, h, 24, '#0F2036', 'rgba(85,214,230,0.3)', 2); noShadow(); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 24); ctx.clip(); const r = rng(5); ctx.strokeStyle = 'rgba(85,214,230,0.12)'; ctx.lineWidth = 3; for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.moveTo(x, y + r() * h); ctx.lineTo(x + w, y + r() * h); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x + r() * w, y); ctx.lineTo(x + r() * w, y + h); ctx.stroke(); }
+      const P = [[x + 90, y + 400], [x + 160, y + 300], [x + 300, y + 260], [x + 340, y + 140]]; const q = eo(pr(t, V(32.6), 1.6));
+      ctx.strokeStyle = A.cyan; ctx.lineWidth = 6; ctx.setLineDash([2, 12]); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(...P[0]); ctx.bezierCurveTo(...P[1], ...P[2], ...P[3]); ctx.stroke(); ctx.setLineDash([]);
+      const bez = (u) => { const m = 1 - u; return [0, 1].map((k) => m * m * m * P[0][k] + 3 * m * m * u * P[1][k] + 3 * m * u * u * P[2][k] + u * u * u * P[3][k]); };
+      const [vx, vy] = bez(q); ctx.beginPath(); ctx.arc(vx, vy, 14, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.beginPath(); ctx.arc(vx, vy, 8, 0, 7); ctx.fillStyle = A.royal; ctx.fill();
+      pin(P[0][0], P[0][1], 20, '#E5484D'); T('الفرع', P[0][0], P[0][1] + 26, { s: 16, w: 700, c: '#C8D6E6', al: 'center', f: 'Tajawal' });
+      icon('device', P[3][0], P[3][1] - 6, 0, '#fff'); ctx.beginPath(); ctx.arc(P[3][0], P[3][1], 22, 0, 7); ctx.fillStyle = q >= 1 ? '#178A55' : 'rgba(255,255,255,0.15)'; ctx.fill(); if (q >= 1) icon('check', P[3][0], P[3][1], 22, '#fff', 3.5);
+      T('بيت العميل', P[3][0], P[3][1] + 42, { s: 16, w: 700, c: '#C8D6E6', al: 'center', f: 'Tajawal' }); ctx.restore();
+    T('نفس اليوم', x + w - 30, y + h - 40, { s: 28, w: 800, c: A.cyan }); ctx.restore(); });
+}
+// S6 — trust: reviews, WhatsApp, book a repair
+function s6(t) {
+  bg(t);
+  browser(80, 90, 1150, 900, 'alathir-almasi.sa/iphone-15-pro', (w, h) => {
+    ctx.fillStyle = '#F6F9FB'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, 90); athir(w - 64, 46, 66); T('الجوالات الجديدة  ›  آيفون', w - 130, 46, { s: 17, w: 600, c: '#7A889C', f: 'Tajawal' });
+    RR(30, 120, 480, 520, 20, '#fff', '#E4EAF0', 1.5); prodPhone(270, 380, 380, '#8A857C', '#46433E');
+    const rx = w - 40; T('iPhone 15 Pro · 256GB', rx, 160, { s: 36, w: 600, c: A.deep }); chip(rx, 214, 'تقسيط متاح', '#E6FAF0', '#178A55', { s: 17 });
+    const rp = pop(t, V(35.52), 0.5, 14); withA(rp.a, () => { ctx.save(); ctx.translate(0, rp.y); RR(560, 260, w - 600, 150, 20, '#FFF9E8', '#F3E2B0', 1.5);
+      T('4.8', rx - 20, 318, { s: 60, w: 600, c: A.deep, al: 'right' }); for (let i = 0; i < 5; i++) { const sp = back(pr(t, V(35.52) + 0.15 + i * 0.07, 0.3)); if (sp > 0) star(rx - 150 - i * 40, 312, 16 * sp, '#F5B400'); }
+      T('من أكثر من 50 تقييم حقيقي على خرائط جوجل', rx - 20, 375, { s: 19, w: 700, c: '#8A6400', f: 'Tajawal' }); ctx.restore(); });
+    const TH = ['أسعار منافسة', 'جودة المنتجات', 'فريق محترف', 'حسن التعامل']; let cx = rx; TH.forEach((s, i) => { const p = pop(t, V(36.16) + i * 0.15, 0.35, 10); if (p.a <= 0) { cx -= TW('✓ ' + s, { s: 15, w: 700, f: 'Tajawal' }) + 42; return; } withA(p.a, () => { const cw = chip(cx, 446 + p.y, '✓ ' + s, A.sky, A.blue, { s: 15 }); cx -= cw + 10; }); });
+    T('يشيد العملاء باستمرار بـ:', rx, 492, { s: 15, w: 500, c: '#9AA6B8', f: 'Tajawal', a: 0 });
+    RR(560, 540, w - 600, 64, 32, A.royal); T('أضف للسلة', (560 + w - 40) / 2, 572, { s: 24, w: 800, c: '#fff', al: 'center', f: 'Tajawal' });
+    // WhatsApp floating button
+    const wp = pop(t, V(38.04), 0.45, 0); withA(wp.a, () => { ctx.save(); ctx.translate(90, h - 90); ctx.scale(wp.s, wp.s); const pu = (t * 1.2) % 1; ctx.globalAlpha *= 1 - pu; ctx.beginPath(); ctx.arc(0, 0, 40 + pu * 30, 0, 7); ctx.strokeStyle = C.green; ctx.lineWidth = 4; ctx.stroke(); ctx.globalAlpha = wp.a; waIcon(0, 0, 40); ctx.restore();
+      RR(150, h - 120, 330, 60, 30, '#fff', '#D7E9DE', 1.5); T('تواصل معنا على واتساب', 315, h - 89, { s: 19, w: 800, c: C.greenD, al: 'center', f: 'Tajawal' }); });
+  });
+  // booking phone
+  const bp = pop(t, V(39.04), 0.55, 50);
+  withA(bp.a, () => { ctx.save(); ctx.translate(0, bp.y); phone(1560, 560, 380, 820, (x, y, w, h) => {
+    ctx.fillStyle = '#F6F9FB'; ctx.fillRect(x, y, w, h); const g = ctx.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, A.royal); g.addColorStop(1, '#22C3D6'); ctx.fillStyle = g; ctx.fillRect(x, y, w, 170);
+    T('احجز صيانتك', x + w - 28, y + 96, { s: 30, w: 900, c: '#fff' }); T('حدد الموعد وتعال بدون انتظار', x + w - 28, y + 136, { s: 15, w: 500, c: '#E8FBFC', f: 'Tajawal' });
+    const F = [['نوع الجهاز', 'iPhone 13'], ['العطل', 'تغيير بطارية'], ['الفرع', 'الفرع الرئيسي · المنفوحة'], ['الموعد', 'السبت · 7:00 م']];
+    F.forEach(([k, v], i) => { const p = pop(t, V(39.3) + i * 0.18, 0.35, 10), yy = y + 200 + i * 104; withA(p.a, () => { T(k, x + w - 28, yy + p.y, { s: 15, w: 700, c: '#7A889C', f: 'Tajawal' }); RR(x + 20, yy + 18 + p.y, w - 40, 54, 12, '#fff', '#DCE5EC', 1.5); T(v, x + w - 40, yy + 46 + p.y, { s: 18, w: 700, c: A.deep, f: AR.test(v) ? 'Tajawal' : 'Montserrat' }); }); });
+    const cp = pr(t, V(40.4), 0.4); RR(x + 20, y + h - 120, w - 40, 62, 31, cp > 0 ? '#178A55' : A.royal); T(cp > 0 ? 'تم حجز الزيارة ✓' : 'احجز الزيارة', x + w / 2, y + h - 88, { s: 21, w: 800, c: '#fff', al: 'center', f: 'Tajawal' });
+  }); ctx.restore(); });
+}
+// S7 — ads platforms + Google Maps fix
+function s7(t) {
+  bg(t);
+  withA(eo(pr(t, 45.9, 0.5)), () => { eyebrow('جاهز للإعلانات والبحث', 1800, 150); T('عملاؤكم يلقونكم في كل مكان', 1800, 220, { s: 56, w: 800 }); });
+  const hx = 760, hy = 520;
+  const PL = [['Snapchat', '#FFFC00', '#111', V(41.72), -300, -170], ['TikTok', '#111', '#fff', V(42.24), 300, -170], ['Meta', '#0866FF', '#fff', V(42.8), -300, 170], ['Google', '#fff', '#3C4043', V(43.2), 300, 170]];
+  PL.forEach(([n, bgc, fg, t0, dx, dy]) => { const q = eo(pr(t, t0, 0.5)); if (q <= 0) return; ctx.strokeStyle = 'rgba(85,214,230,0.6)'; ctx.lineWidth = 3; ctx.setLineDash([8, 10]); ctx.lineDashOffset = -t * 40; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + dx * q, hy + dy * q); ctx.stroke(); ctx.setLineDash([]); });
+  const hp = pop(t, 45.9, 0.5, 0); withA(hp.a, () => { ctx.save(); ctx.translate(hx, hy); ctx.scale(hp.s, hp.s); shadow(40, 14, 'rgba(0,0,0,0.5)'); RR(-150, -120, 300, 240, 30, '#fff'); noShadow(); athir(0, -14, 150); T('متجركم', 0, 92, { s: 22, w: 800, c: A.deep, al: 'center', f: 'Tajawal' }); ctx.restore(); });
+  PL.forEach(([n, bgc, fg, t0, dx, dy]) => { const p = back(pr(t, t0 + 0.25, 0.45)); if (p <= 0) return; ctx.save(); ctx.translate(hx + dx, hy + dy); ctx.scale(p, p); shadow(24, 10, 'rgba(0,0,0,0.4)'); RR(-120, -46, 240, 92, 22, bgc); noShadow(); if (bgc === '#fff' || bgc === '#111') RR(-120, -46, 240, 92, 22, null, 'rgba(255,255,255,0.25)', 1.5); T(n, 0, 2, { s: 32, w: 600, c: fg, al: 'center' }); ctx.restore(); });
+  withA(eo(pr(t, V(42.5), 0.5)), () => T('ربط أدوات القياس · كتالوج المنتجات · تسوّق جوجل', hx, 830, { s: 24, w: 700, c: C.mut, al: 'center', f: 'Tajawal' }));
+  // maps name fix
+  const mp = pop(t, V(43.92), 0.5, 30);
+  withA(mp.a, () => { ctx.save(); ctx.translate(0, mp.y); const x = 1240, y = 380, w = 580, h = 420; shadow(40, 14, 'rgba(0,0,0,0.45)'); RR(x, y, w, h, 26, '#fff'); noShadow();
+    pin(x + w - 50, y + 84, 20, '#E5484D'); T('خرائط جوجل', x + w - 84, y + 60, { s: 24, w: 800, c: A.deep, f: 'Tajawal' });
+    T('قبل', x + w - 34, y + 140, { s: 18, w: 700, c: '#9AA6B8', f: 'Tajawal' });
+    const s0 = 'الأثير الماسي لبيع الجولات'; const w0 = T(s0, x + w - 34, y + 186, { s: 28, w: 700, c: '#B0546A', f: 'Tajawal' });
+    const k = eo(pr(t, V(44.3), 0.4)); ctx.fillStyle = '#E5566B'; ctx.fillRect(x + w - 34 - w0 * k, y + 186, w0 * k, 3);
+    const ap = pop(t, V(44.8), 0.45, 12); withA(ap.a, () => { T('بعد', x + w - 34, y + 256 + ap.y, { s: 18, w: 700, c: '#9AA6B8', f: 'Tajawal' }); const w1 = T('الأثير الماسي لبيع الجوالات', x + w - 34, y + 302 + ap.y, { s: 30, w: 800, c: '#178A55', f: 'Tajawal' }); icon('check', x + w - 64 - w1, y + 302 + ap.y, 30, '#178A55', 4); });
+    withA(eo(pr(t, V(45.2), 0.4)), () => T('+ تحديث الصور والبيانات للفرعين', x + w - 34, y + 372, { s: 19, w: 600, c: '#6B7A90', f: 'Tajawal' }));
+    ctx.restore(); });
+}
+// S8 — Salla or Zid
+function s8(t) {
+  bg(t);
+  withA(eo(pr(t, 51.3, 0.5)), () => { T('المنصة المقترحة', 960, 170, { s: 30, w: 700, c: C.cyan, al: 'center' }); });
+  withA(eo(pr(t, 51.3, 0.5)), () => T('سلة أم زد؟', 960, 250, { s: 70, w: 800, al: 'center' }));
+  const P = [[V(46.0), 'سلة', '#0B6A6E', ['تنوع واسع جداً في القوالب', 'سوق تطبيقات كبير', 'تقسيط بتمارا وتابي'], 1340], [V(46.48), 'زد', '#5B3FC4', ['قوية في إدارة المخزون والفروع', 'إدارة يومية سهلة', 'تقسيط بتمارا وتابي'], 580]];
+  P.forEach(([t0, n, col, B, cx]) => { const p = pop(t, t0, 0.5, 40); withA(p.a, () => { ctx.save(); ctx.translate(0, p.y); const x = cx - 290, y = 340, w = 580, h = 440; shadow(40, 14, 'rgba(0,0,0,0.4)'); RR(x, y, w, h, 28, '#fff'); noShadow();
+    RR(x, y, w, 120, [28, 28, 0, 0], col); T(n, cx, y + 64, { s: 56, w: 900, c: '#fff', al: 'center' });
+    B.forEach((b, i) => { dia(x + w - 44, y + 190 + i * 76, 9, col); T(b, x + w - 70, y + 192 + i * 76, { s: 26, w: 700, c: A.deep, f: 'Tajawal' }); }); ctx.restore(); }); });
+  const cp = pop(t, V(46.93), 0.5, 0); withA(cp.a, () => { ctx.save(); ctx.translate(960, 870); ctx.scale(cp.s, cp.s); shadow(30, 10, 'rgba(0,0,0,0.4)'); RR(-330, -48, 660, 96, 48, C.navy, A.cyan, 2.5); noShadow(); T('نختار معكم الأنسب لكم', 0, 2, { s: 36, w: 800, c: A.cyan, al: 'center' }); ctx.restore(); });
+}
+// S9 — timeline (3 weeks + monthly growth)
+function s9(t) {
+  bg(t);
+  const hp = pop(t, V(48.4) - 0.2, 0.5, 20); withA(hp.a, () => { eyebrow('الجدول الزمني', 1780, 170 + hp.y); T('من الاعتماد إلى الإطلاق في 3 أسابيع', 1780, 245 + hp.y, { s: 64, w: 800 }); });
+  const WK = [[V(49.79), 'الأسبوع الأول', 'التأسيس', 'التأسيس التقني، تفعيل الدفع والشحن، واعتماد التصميم'], [V(50.32), 'الأسبوع الثاني', 'البناء', 'تنفيذ التصميم والبانرات، وإضافة المنتجات'], [V(50.59), 'الأسبوع الثالث', 'الإطلاق', 'ربط القياس، الاختبار، التدريب، والإطلاق الرسمي'], [V(51.2), 'من الأسبوع الرابع', 'النمو', 'إدارة شهرية للمتجر وتحسين ظهوره في البحث']];
+  const xs = [1590, 1150, 710, 270], ly = 450; ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(170, ly - 2, 1520, 4);
+  let last = -1; WK.forEach((w, i) => { if (t >= w[0]) last = i; });
+  if (last >= 0) { const f = (1590 - xs[last]) + 0 * eo(pr(t, WK[last][0], 0.4)); ctx.fillStyle = A.cyan; ctx.fillRect(1590 - f, ly - 2, f + 100, 4); }
+  WK.forEach(([t0, wk, ti, ds], i) => { const p = pop(t, t0, 0.5, 24), x = xs[i], on = t >= t0, gr = i === 3; const b = back(pr(t, t0, 0.4));
+    dia(x, ly, 24 * Math.max(0.55, b), on ? (gr ? A.royal : C.teal) : '#2A3B57'); if (on) dia(x, ly, 11 * b, A.cyan);
+    withA(0.25 + 0.75 * p.a, () => { ctx.save(); ctx.translate(0, p.y); RR(x - 200, ly + 60, 400, 330, 22, gr && on ? '#12305A' : '#14253E', on ? 'rgba(85,214,230,0.35)' : 'rgba(255,255,255,0.08)', 2);
+      T(wk, x + 170, ly + 110, { s: 24, w: 800, c: A.cyan }); T(ti, x + 170, ly + 170, { s: 44, w: 800 }); wrap(ds, x + 170, ly + 236, 340, 42, { s: 23, w: 500, c: '#B6C3D6', f: 'Tajawal' }); ctx.restore(); }); });
+}
+// S10 — numbers
+function s10(t) {
+  bg(t);
+  withA(eo(pr(t, 61.0, 0.5)), () => { T('ما يشمله العرض', 960, 200, { s: 30, w: 700, c: C.cyan, al: 'center' }); T('كل شيء جاهز من اليوم الأول', 960, 280, { s: 64, w: 800, al: 'center' }); });
+  ctx.save(); ctx.textAlign = 'center'; ctx.restore();
+  const S = [[V(53.92), 150, 'منتجاً مضافاً بالكامل'], [V(55.23), 12, 'بانراً احترافياً'], [60.9, 3, 'أسابيع حتى الإطلاق'], [V(56.08), 30, 'يوماً دعماً فنياً']];
+  S.forEach(([t0, n, lbl], i) => { const p = pop(t, t0, 0.5, 30), x = 1500 - i * 380, y = 560; withA(p.a, () => { ctx.save(); ctx.translate(0, p.y); RR(x - 170, y - 150, 340, 330, 26, '#14253E', 'rgba(85,214,230,0.3)', 2); ctx.fillStyle = A.cyan; ctx.fillRect(x - 120, y - 150, 240, 5);
+    const v = Math.round(lerp(0, n, eo(pr(t, t0, 1.0)))); T(String(v), x, y - 10, { s: 120, w: 900, c: '#fff', al: 'center', f: 'Cairo' }); T(lbl, x, y + 110, { s: 28, w: 700, c: C.mut, al: 'center', f: 'Tajawal' }); ctx.restore(); }); });
+}
+// S11 — end card
+function s11(t) {
+  bg(t);
+  const tw = V(57.947), pulse = t > tw ? Math.exp(-(t - tw) * 2) : 0;
+  // store phone with client logo
+  const pp = pop(t, 65.9, 0.7, 50);
+  withA(pp.a, () => { ctx.save(); ctx.translate(0, pp.y); const g = ctx.createRadialGradient(480, 560, 0, 480, 560, 460); g.addColorStop(0, `rgba(78,242,243,${0.16 + 0.2 * pulse})`); g.addColorStop(1, 'rgba(78,242,243,0)'); ctx.fillStyle = g; ctx.fillRect(0, 60, 960, 1000);
+    phone(480, 560, 360, 780, (x, y, w, h) => { ctx.save(); ctx.translate(x, y); ctx.scale(w / 330, w / 330); storeMobile(t, 330, h * 330 / w); ctx.restore(); }); ctx.restore(); });
+  withA(eo(pr(t, 66.0, 0.6)), () => { wordmark(1780, 130, 44); T('شريك النمو الرقمي', 1520, 133, { s: 24, w: 500, c: C.mut, f: 'Tajawal' }); logo(1220, 132, 30 + 6 * pulse, { glow: pulse }); });
+  const h = pop(t, 66.3, 0.6, 30);
+  withA(h.a, () => { ctx.save(); ctx.translate(0, h.y); eyebrow('الخطوة التالية', 1780, 290); T('متجركم جاهز للبيع', 1780, 375, { s: 76, w: 800 }); T('خلال 3 أسابيع', 1780, 470, { s: 76, w: 800, c: A.cyan }); ctx.fillStyle = A.cyan; ctx.fillRect(1780 - 220, 540, 220, 6); ctx.restore(); });
+  const tag = pop(t, V(59.28), 0.6, 16); withA(tag.a, () => T('TwinAI · شريك نموّكم الرقمي', 1780, 610 + tag.y, { s: 34, w: 700, f: 'Tajawal' }));
+  [[67.0, 'call', 'للتواصل والاعتماد', '+966 50 162 0249'], [67.25, 'globe', 'الموقع الإلكتروني', 'twinai.pro']].forEach(([t0, ic, k, v], i) => { const p = pop(t, t0, 0.5, 16); withA(p.a, () => { const y = 710 + i * 110 + p.y; RR(1700, y - 38, 80, 80, 20, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.14)', 1.5); icon(ic, 1740, y + 2, 34, C.cyan, 2.5);
+    T(k, 1670, y - 18, { s: 20, w: 500, c: C.mut, f: 'Tajawal' }); T(v, 1670, y + 22, { s: 38, w: 600, al: 'right', ltr: true }); }); });
+  withA(eo(pr(t, 67.8, 0.6)), () => { ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(1000, 975, 780, 1.5); T('مقدَّم إلى: مؤسسة الأثير الماسي لبيع وصيانة الجوالات', 1780, 1015, { s: 22, w: 500, c: C.mut, f: 'Tajawal' }); });
+}
+
+// ================= timeline =================
+const SC = [[0, 10.3, s1], [10.3, 16.7, s2], [16.7, 22.1, s3], [22.1, 32.3, s4], [32.3, 39.5, s5], [39.5, 45.5, s6], [45.5, 51.1, s7], [51.1, 54.5, s8], [54.5, 60.8, s9], [60.8, 65.7, s10], [65.7, DUR, s11]];
+const TR = 0.7;
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
+  let i = SC.findIndex(([a, b]) => t >= a && t < b); if (i < 0) i = SC.length - 1;
+  const [a, , fn] = SC[i];
+  if (i > 0 && t < a + TR) {
+    SC[i - 1][2](t);
+    const p = eio(pr(t, a, TR)), s = p * 1500;
+    const path = () => { ctx.beginPath(); ctx.moveTo(960, 540 - s); ctx.lineTo(960 + s * 1.2, 540); ctx.lineTo(960, 540 + s); ctx.lineTo(960 - s * 1.2, 540); ctx.closePath(); };
+    ctx.save(); path(); ctx.clip(); fn(t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = Math.sin(p * Math.PI); ctx.strokeStyle = C.cyan; ctx.lineWidth = 5; path(); ctx.stroke(); ctx.restore();
+  } else fn(t);
+  const fo = Math.max(1 - pr(t, 0, 0.4), pr(t, DUR - 0.8, 0.8));
+  if (fo > 0) { ctx.fillStyle = `rgba(7,13,24,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+window.__ready = false; window.seek = (t) => { draw(t); return true; };
+(async () => {
+  await new Promise((res) => { const im = new Image(); im.onload = () => { IMG.athir = im; res(); }; im.onerror = res; im.src = 'assets/athir_logo.png'; });
+  await Promise.all(['900 40px Cairo', '800 40px Cairo', '700 40px Cairo', '500 40px Tajawal', '700 40px Tajawal', '800 40px Tajawal', '600 40px Montserrat', '500 40px Montserrat'].map((f) => document.fonts.load(f, 'abcأب')));
+  await document.fonts.ready; window.__ready = true; draw(0);
+})();
+</script></body></html>
