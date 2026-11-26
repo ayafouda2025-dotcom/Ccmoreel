@@ -1,0 +1,505 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>html,body{margin:0;background:#0B1424}canvas{display:block}</style>
+</head><body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// TwinAI CRM explainer for مؤسسة الأثير الماسي — 1920x1080, window.seek(t) paints frame t
+const W = 1920, H = 1080, DUR = 76.5;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const C = { bg: '#0B1424', bg2: '#0F1B2E', navy: '#0F1B2E', panel: '#16263F', teal: '#0E7C8C', teal2: '#12909F', tealD: '#0A5F6C', cyan: '#55D6E6',
+  white: '#F3F6FA', mut: '#8C9BB2', mut2: '#5D6C84', cream: '#F4F1EA', app: '#F3F5F8', card: '#FFFFFF', ink: '#0F1B2E', ink2: '#45536A', line: '#E3E8EF',
+  amber: '#B2702E', green: '#25D366', greenD: '#128C4A', red: '#E5566B', gold: '#F2B93B', bubble: '#E6F7F9' };
+
+// ---- VO segments [src_start, src_end, dst_start] (audio/vo_a.mp3) ----
+const SEG = [[0.10, 5.95, 0.6], [6.25, 13.40, 7.0], [13.60, 16.58, 15.2], [16.75, 24.18, 19.0], [24.38, 31.22, 27.2], [31.22, 38.36, 34.8],
+  [38.36, 45.80, 42.7], [45.80, 52.93, 51.1], [52.93, 58.28, 59.2], [58.28, 61.80, 65.3], [61.80, 65.50, 69.8]];
+const V = (s) => { for (const [a, b, d] of SEG) if (s < b) return s >= a ? d + s - a : d - Math.min(0.3, a - s); const [a, , d] = SEG[SEG.length - 1]; return d + s - a; };
+
+// ---- utils ----
+const cl = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const pr = (t, a, d) => cl((t - a) / d);
+const eo = (x) => 1 - Math.pow(1 - x, 3), eio = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const lerp = (a, b, p) => a + (b - a) * p;
+const AR = /[؀-ۿ]/;
+function rng(s) { return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+function T(s, x, y, o = {}) {
+  ctx.save();
+  ctx.font = `${o.w || 700} ${o.s || 40}px ${o.f || (AR.test(s) ? 'Cairo' : 'Montserrat')}`;
+  ctx.fillStyle = o.c || C.white; ctx.globalAlpha *= (o.a ?? 1);
+  ctx.textAlign = o.al || 'right'; ctx.textBaseline = o.bl || 'middle';
+  ctx.direction = AR.test(s) && !o.ltr ? 'rtl' : 'ltr';
+  if (o.ls) ctx.letterSpacing = o.ls + 'px';
+  ctx.fillText(s, x, y); const w = ctx.measureText(s).width; ctx.restore(); return w;
+}
+function TW(s, o = {}) { ctx.save(); ctx.font = `${o.w || 700} ${o.s || 40}px ${o.f || (AR.test(s) ? 'Cairo' : 'Montserrat')}`; if (o.ls) ctx.letterSpacing = o.ls + 'px'; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+function RR(x, y, w, h, r, fill, stroke, lw = 2) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+function shadow(b = 30, y = 12, c = 'rgba(5,12,25,0.35)') { ctx.shadowColor = c; ctx.shadowBlur = b; ctx.shadowOffsetY = y; }
+function noShadow() { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; }
+function dia(cx, cy, s, fill, stroke, lw = 2) { ctx.beginPath(); ctx.moveTo(cx, cy - s); ctx.lineTo(cx + s, cy); ctx.lineTo(cx, cy + s); ctx.lineTo(cx - s, cy); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } }
+// pop-in helper: returns {a, y, s}
+function pop(t, t0, d = 0.45, dy = 26) { const p = pr(t, t0, d); return { a: eo(p), y: (1 - eo(p)) * dy, s: lerp(0.92, 1, back(p)), p }; }
+function withA(a, fn) { if (a <= 0.001) return; ctx.save(); ctx.globalAlpha *= a; fn(); ctx.restore(); }
+
+// ---- brand pieces ----
+function logo(cx, cy, s, o = {}) {
+  const b = o.build ?? 1, glow = o.glow ?? 0;
+  ctx.save();
+  if (glow > 0) { const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 2.2); g.addColorStop(0, `rgba(85,214,230,${0.35 * glow})`); g.addColorStop(1, 'rgba(85,214,230,0)'); ctx.fillStyle = g; ctx.fillRect(cx - s * 2.5, cy - s * 2.5, s * 5, s * 5); }
+  // four facets flying in
+  const facets = [[[0, -1], [1, 0], [0, 0], '#13A0B0', [1, -1]], [[1, 0], [0, 1], [0, 0], '#0E8696', [1, 1]], [[0, 1], [-1, 0], [0, 0], '#0A6371', [-1, 1]], [[-1, 0], [0, -1], [0, 0], '#0F7A89', [-1, -1]]];
+  facets.forEach(([p1, p2, p3, col, dir], i) => {
+    const q = eo(cl(b * 1.6 - i * 0.2)); const off = (1 - q) * s * 2.2, rot = (1 - q) * (i % 2 ? 0.8 : -0.8);
+    ctx.save(); ctx.globalAlpha *= q; ctx.translate(cx + dir[0] * off, cy + dir[1] * off); ctx.rotate(rot);
+    ctx.beginPath(); ctx.moveTo(p1[0] * s, p1[1] * s); ctx.lineTo(p2[0] * s, p2[1] * s); ctx.lineTo(p3[0] * s, p3[1] * s); ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+    ctx.restore();
+  });
+  const q2 = eo(pr(b, 0.6, 0.4));
+  withA(q2, () => { dia(cx, cy, s * 0.6, null, 'rgba(120,225,236,0.55)', Math.max(1.5, s * 0.018)); });
+  const q3 = back(pr(b, 0.75, 0.25));
+  if (q3 > 0) dia(cx + s * 0.3, cy + s * 0.36, s * 0.32 * q3, C.cyan);
+  ctx.restore();
+}
+function wordmark(xr, y, s, a = 1) { // right-aligned "◆ TwinAI" like the PDF header
+  withA(a, () => { dia(xr - s * 0.32, y, s * 0.3, C.cyan); T('TwinAI', xr - s * 0.85, y + s * 0.04, { s, w: 600, f: 'Montserrat', al: 'right' }); });
+}
+function bg(t, o = {}) {
+  ctx.fillStyle = o.dark ? '#070D18' : C.bg; ctx.fillRect(0, 0, W, H);
+  const k = o.dark ? 0.55 : 1;
+  let g = ctx.createRadialGradient(260 + Math.sin(t * 0.2) * 40, 90, 0, 260, 90, 950); g.addColorStop(0, `rgba(22,62,104,${0.6 * k})`); g.addColorStop(1, 'rgba(22,62,104,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  g = ctx.createRadialGradient(220, 1040, 0, 220, 1040, 720); g.addColorStop(0, `rgba(14,108,116,${0.55 * k})`); g.addColorStop(1, 'rgba(14,108,116,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  g = ctx.createRadialGradient(1750, 900, 0, 1750, 900, 600); g.addColorStop(0, `rgba(30,60,110,${0.25 * k})`); g.addColorStop(1, 'rgba(30,60,110,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // faint dot grid
+  ctx.fillStyle = 'rgba(140,170,210,0.06)';
+  for (let x = 40; x < W; x += 48) for (let y = 40; y < H; y += 48) ctx.fillRect(x, y, 2, 2);
+}
+function eyebrow(s, xr, y, a = 1) { T(s, xr, y, { s: 30, w: 700, c: C.cyan, a }); }
+
+// ---- icons (line style) ----
+function icon(kind, cx, cy, s, col, lw = 3) {
+  ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const u = s / 2;
+  if (kind === 'chat') { ctx.beginPath(); ctx.roundRect(cx - u, cy - u * 0.8, u * 2, u * 1.4, u * 0.35); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u * 0.4, cy + u * 0.6); ctx.lineTo(cx - u * 0.7, cy + u); ctx.lineTo(cx - u * 0.05, cy + u * 0.6); ctx.stroke(); for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.arc(cx + i * u * 0.45, cy - u * 0.1, lw * 0.6, 0, 7); ctx.fill(); } }
+  else if (kind === 'bot') { ctx.beginPath(); ctx.roundRect(cx - u * 0.85, cy - u * 0.5, u * 1.7, u * 1.3, u * 0.35); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx, cy - u * 0.5); ctx.lineTo(cx, cy - u * 0.9); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy - u * 0.98, lw, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(cx - u * 0.38, cy + u * 0.1, lw * 1.1, 0, 7); ctx.arc(cx + u * 0.38, cy + u * 0.1, lw * 1.1, 0, 7); ctx.fill(); }
+  else if (kind === 'device') { ctx.beginPath(); ctx.roundRect(cx - u * 0.55, cy - u, u * 1.1, u * 2, u * 0.2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u * 0.15, cy + u * 0.72); ctx.lineTo(cx + u * 0.15, cy + u * 0.72); ctx.stroke(); }
+  else if (kind === 'call') { ctx.translate(cx, cy); ctx.rotate(-Math.PI / 4); ctx.lineWidth = Math.max(lw, u * 0.28); ctx.beginPath(); ctx.arc(0, 0, u * 0.62, Math.PI * 0.72, Math.PI * 1.28); ctx.stroke(); for (const a of [0.7, 1.3]) { ctx.beginPath(); ctx.ellipse(Math.cos(Math.PI * a) * u * 0.62, Math.sin(Math.PI * a) * u * 0.62, u * 0.2, u * 0.3, Math.PI * a + Math.PI / 2, 0, 7); ctx.fill(); } }
+  else if (kind === 'alert') { ctx.beginPath(); ctx.moveTo(cx, cy - u); ctx.lineTo(cx + u, cy + u * 0.8); ctx.lineTo(cx - u, cy + u * 0.8); ctx.closePath(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx, cy - u * 0.3); ctx.lineTo(cx, cy + u * 0.2); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + u * 0.5, lw * 0.7, 0, 7); ctx.fill(); }
+  else if (kind === 'cal') { ctx.beginPath(); ctx.roundRect(cx - u, cy - u * 0.75, u * 2, u * 1.75, u * 0.2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u, cy - u * 0.25); ctx.lineTo(cx + u, cy - u * 0.25); ctx.stroke(); for (const dx of [-0.45, 0.45]) { ctx.beginPath(); ctx.moveTo(cx + dx * u, cy - u); ctx.lineTo(cx + dx * u, cy - u * 0.55); ctx.stroke(); } for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { ctx.fillRect(cx - u * 0.55 + i * u * 0.5, cy + u * 0.1 + j * u * 0.4, lw, lw); } }
+  else if (kind === 'branch') { const pts = [[0, -0.7], [-0.75, 0.6], [0.75, 0.6]]; ctx.beginPath(); ctx.moveTo(cx, cy - u * 0.7); ctx.lineTo(cx - u * 0.75, cy + u * 0.6); ctx.moveTo(cx, cy - u * 0.7); ctx.lineTo(cx + u * 0.75, cy + u * 0.6); ctx.stroke(); for (const [a, b] of pts) { ctx.beginPath(); ctx.arc(cx + a * u, cy + b * u, u * 0.28, 0, 7); ctx.fill(); } }
+  else if (kind === 'chart') { [[-0.7, 0.3], [-0.1, -0.3], [0.5, -0.8]].forEach(([x, top]) => { ctx.fillRect(cx + x * u, cy + top * u, u * 0.4, (1 - top) * u - u * 0.1); }); }
+  else if (kind === 'shield') { ctx.beginPath(); ctx.moveTo(cx, cy - u); ctx.lineTo(cx + u * 0.85, cy - u * 0.6); ctx.lineTo(cx + u * 0.8, cy + u * 0.1); ctx.quadraticCurveTo(cx + u * 0.6, cy + u * 0.75, cx, cy + u); ctx.quadraticCurveTo(cx - u * 0.6, cy + u * 0.75, cx - u * 0.8, cy + u * 0.1); ctx.lineTo(cx - u * 0.85, cy - u * 0.6); ctx.closePath(); ctx.stroke(); }
+  else if (kind === 'check') { ctx.beginPath(); ctx.moveTo(cx - u * 0.6, cy); ctx.lineTo(cx - u * 0.15, cy + u * 0.45); ctx.lineTo(cx + u * 0.65, cy - u * 0.45); ctx.stroke(); }
+  else if (kind === 'bell') { ctx.beginPath(); ctx.moveTo(cx - u * 0.75, cy + u * 0.5); ctx.quadraticCurveTo(cx - u * 0.6, cy + u * 0.3, cx - u * 0.6, cy - u * 0.1); ctx.arc(cx, cy - u * 0.1, u * 0.6, Math.PI, 0); ctx.quadraticCurveTo(cx + u * 0.6, cy + u * 0.3, cx + u * 0.75, cy + u * 0.5); ctx.closePath(); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy + u * 0.72, u * 0.16, 0, 7); ctx.fill(); }
+  else if (kind === 'globe') { ctx.beginPath(); ctx.arc(cx, cy, u * 0.9, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.ellipse(cx, cy, u * 0.4, u * 0.9, 0, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx - u * 0.9, cy); ctx.lineTo(cx + u * 0.9, cy); ctx.stroke(); }
+  else if (kind === 'lock') { ctx.beginPath(); ctx.roundRect(cx - u * 0.7, cy - u * 0.1, u * 1.4, u * 1.05, u * 0.15); ctx.fill(); ctx.beginPath(); ctx.arc(cx, cy - u * 0.15, u * 0.45, Math.PI, 0); ctx.stroke(); }
+  else if (kind === 'star') { star(cx, cy, u, col); }
+  else if (kind === 'moon') { ctx.beginPath(); ctx.arc(cx, cy, u * 0.8, 0, 7); ctx.fill(); ctx.globalCompositeOperation = 'destination-out'; ctx.beginPath(); ctx.arc(cx + u * 0.4, cy - u * 0.3, u * 0.7, 0, 7); ctx.fill(); }
+  ctx.restore();
+}
+function star(cx, cy, r, col, stroke) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } ctx.closePath(); if (stroke) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); } else { ctx.fillStyle = col; ctx.fill(); } }
+function waIcon(cx, cy, r) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fillStyle = C.green; ctx.fill(); icon('call', cx + r * 0.05, cy + r * 0.05, r * 1.0, '#fff', Math.max(1.5, r * 0.12)); }
+
+// ---- phone mockup ----
+function phone(cx, cy, w, h, fn, o = {}) {
+  ctx.save(); shadow(60, 24, 'rgba(0,0,0,0.5)');
+  RR(cx - w / 2, cy - h / 2, w, h, w * 0.13, '#05080F'); noShadow();
+  RR(cx - w / 2, cy - h / 2, w, h, w * 0.13, null, '#2B3B57', 3);
+  const ix = cx - w / 2 + 12, iy = cy - h / 2 + 12, iw = w - 24, ih = h - 24;
+  ctx.save(); ctx.beginPath(); ctx.roundRect(ix, iy, iw, ih, w * 0.11); ctx.clip(); fn(ix, iy, iw, ih); ctx.restore();
+  RR(cx - w * 0.15, iy + 12, w * 0.3, 26, 13, '#05080F');
+  ctx.restore();
+}
+function notif(x, y, w, title, body, time, a = 1, o = {}) { // phone-style notification card (x,y = top-left)
+  withA(a, () => {
+    ctx.save(); shadow(20, 8, 'rgba(0,0,0,0.25)'); RR(x, y, w, o.h || 108, 22, o.bg || 'rgba(245,248,252,0.96)'); noShadow(); ctx.restore();
+    waIcon(x + w - 40, y + 38, 20);
+    T(title, x + w - 72, y + 36, { s: 22, w: 800, c: C.ink, f: 'Tajawal' });
+    T(time, x + 20, y + 36, { s: 18, w: 500, c: C.mut2, al: 'left', f: 'Tajawal' });
+    T(body, x + w - 24, y + 74, { s: 22, w: 500, c: C.ink2, f: 'Tajawal' });
+  });
+}
+
+// ================= SCENES =================
+// S1 — 11 PM hook
+function s1(t) {
+  bg(t, { dark: true });
+  // stars
+  const r = rng(3); for (let i = 0; i < 90; i++) { const x = r() * W, y = r() * H * 0.8, tw = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.3 + i)); ctx.fillStyle = `rgba(200,225,255,${0.35 * tw * r()})`; ctx.fillRect(x, y, 2, 2); }
+  // moon
+  withA(eo(pr(t, 0.2, 1.2)), () => { const g = ctx.createRadialGradient(1640, 210, 0, 1640, 210, 220); g.addColorStop(0, 'rgba(85,214,230,0.18)'); g.addColorStop(1, 'rgba(85,214,230,0)'); ctx.fillStyle = g; ctx.fillRect(1400, 0, 480, 450); icon('moon', 1640, 210, 110, '#DCEBF5'); });
+  // phone
+  const pa = pop(t, 0.15, 0.9, 60), cx = 1180, cy = 545 + pa.y;
+  withA(pa.a, () => phone(cx, cy, 400, 820, (x, y, w, h) => {
+    let g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#16304F'); g.addColorStop(1, '#0B1A2C'); ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    const flip = pr(t, V(0.53), 0.35);
+    const tm = flip < 0.5 ? '10:59' : '11:00';
+    ctx.save(); const sc = flip > 0 && flip < 1 ? Math.abs(Math.cos(flip * Math.PI)) : 1; ctx.translate(x + w / 2, y + 190); ctx.scale(1, Math.max(0.05, sc)); T(tm, 0, 0, { s: 110, w: 500, al: 'center' }); ctx.restore();
+    T('PM', x + w / 2, y + 270, { s: 26, w: 600, c: C.mut, al: 'center', ls: 4 });
+    T('الخميس', x + w / 2, y + 108, { s: 26, w: 700, c: C.mut, al: 'center', f: 'Tajawal' });
+    const n = pop(t, V(1.84), 0.5, -40);
+    notif(x + 16, y + 330 + n.y, w - 32, 'عميل جديد', 'كم تغيير شاشة جوالي؟', 'الآن', n.a, { h: 112 });
+    const n2 = pop(t, V(3.6), 0.5, -40);
+    withA(n2.a * 0.9, () => { RR(x + 30, y + 455 + n2.y, w - 60, 54, 18, 'rgba(245,248,252,0.18)'); T('لا يوجد أحد للرد…', x + w / 2, y + 482 + n2.y, { s: 21, w: 500, c: '#C9D6E6', al: 'center', f: 'Tajawal' }); });
+  }));
+  // closed sign swinging
+  const sp = pop(t, V(4.72), 0.6, -80);
+  withA(sp.a, () => {
+    const sw = Math.sin((t - V(4.72)) * 3.2) * 0.12 * Math.exp(-(t - V(4.72)) * 0.6);
+    ctx.save(); ctx.translate(520, 300 + sp.y); ctx.rotate(sw);
+    ctx.strokeStyle = '#7F8EA6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-90, 0); ctx.lineTo(0, -90); ctx.lineTo(90, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -90, 8, 0, 7); ctx.fillStyle = '#9AA8BE'; ctx.fill();
+    shadow(30, 14, 'rgba(0,0,0,0.5)'); RR(-190, 0, 380, 200, 24, C.cream); noShadow();
+    RR(-176, 14, 352, 172, 16, null, C.red, 4);
+    T('مغلق', 0, 80, { s: 78, w: 900, c: C.red, al: 'center' });
+    T('CLOSED', 0, 150, { s: 30, w: 600, c: C.ink2, al: 'center', ls: 8 });
+    ctx.restore();
+  });
+  withA(eo(pr(t, V(1.84), 0.6)), () => { T('11:00 PM', 520, 640, { s: 64, w: 600, c: C.white, al: 'center', ls: 3 }); T('رسالة عميل… والمحل مسكّر', 520, 720, { s: 34, w: 700, c: C.mut, al: 'center', f: 'Tajawal' }); });
+}
+
+// S2 — the chaos without a system
+function s2(t) {
+  bg(t);
+  const items = [[V(6.35), 'رسائل متشتتة بين أكثر من جوال'], [V(8.48), 'أجهزة صيانة لا تعرف حالتها'], [V(10.24), 'شكاوى تضيع… حتى تظهر كتقييم سلبي']];
+  withA(eo(pr(t, 7.0, 0.5)), () => { eyebrow('قبل النظام', 1780, 220); T('يوم عادي في المحل…', 1780, 290, { s: 60, w: 800 }); });
+  items.forEach(([t0, s], i) => { const p = pop(t, t0, 0.5, 0); const y = 430 + i * 120; withA(p.a, () => {
+    ctx.save(); ctx.translate((1 - p.a) * 60, 0);
+    RR(1060, y - 44, 720, 88, 18, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.10)', 1.5);
+    dia(1740, y, 12, C.amber); T(s, 1710, y + 2, { s: 32, w: 700, f: 'Tajawal' }); ctx.restore(); }); });
+  // left visual: scattered phones with badges
+  const jit = (k) => Math.sin(t * 9 + k) * 1.5;
+  [[260, 460, -0.18, 0], [560, 380, 0.12, 1], [420, 720, 0.06, 2]].forEach(([x, y, rot, k]) => {
+    const p = pop(t, V(6.35) + k * 0.35, 0.5, 40); withA(p.a, () => {
+      ctx.save(); ctx.translate(x + jit(k), y + p.y); ctx.rotate(rot);
+      phone(0, 0, 190, 380, (ix, iy, iw, ih) => { ctx.fillStyle = '#132842'; ctx.fillRect(ix, iy, iw, ih);
+        for (let m = 0; m < 4; m++) { const mp = pr(t, V(6.6) + k * 0.4 + m * 0.5, 0.3); withA(mp, () => RR(ix + (m % 2 ? 14 : 40), iy + 60 + m * 64, iw - 54, 46, 12, m % 2 ? '#DDF6E4' : '#F4F6F9')); }
+      });
+      const n = Math.floor(lerp(3, [27, 43, 18][k], eo(pr(t, V(6.6) + k * 0.3, 5))));
+      const bp = back(pr(t, V(6.6) + k * 0.3, 0.4));
+      ctx.beginPath(); ctx.arc(80, -180, 34 * bp, 0, 7); ctx.fillStyle = C.red; ctx.fill();
+      if (bp > 0.5) T(String(n), 80, -178, { s: 30, w: 600, al: 'center' });
+      ctx.restore(); });
+  });
+  // paper tickets fluttering
+  const r = rng(11);
+  for (let i = 0; i < 6; i++) { const t0 = V(8.48) + i * 0.18, p = pr(t, t0, 0.5); if (p <= 0) continue;
+    const x0 = 120 + r() * 640, y0 = 240 + r() * 120, fall = (t - t0) * 38, sway = Math.sin((t - t0) * 2 + i) * 30, rot = Math.sin((t - t0) * 1.6 + i) * 0.4 + (r() - 0.5);
+    withA(eo(p), () => { ctx.save(); ctx.translate(x0 + sway, y0 + fall + 200); ctx.rotate(rot); shadow(14, 6, 'rgba(0,0,0,0.3)');
+      RR(-90, -55, 180, 110, 8, '#F6EFD9'); noShadow(); T('جهاز #؟؟', 70, -22, { s: 22, w: 800, c: C.ink, f: 'Tajawal' }); T('الحالة: ؟', 70, 14, { s: 20, w: 500, c: C.amber, f: 'Tajawal' });
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 2; for (let l = 0; l < 2; l++) { ctx.beginPath(); ctx.moveTo(-70, 36 + l * 0); ctx.lineTo(60, 36); ctx.stroke(); } ctx.restore(); }); }
+  // negative review card
+  const rp = pop(t, V(12.36), 0.5, 60), sh = rp.p >= 1 ? Math.sin((t - V(12.36) - 0.5) * 40) * 6 * Math.exp(-(t - V(12.36) - 0.5) * 5) : 0;
+  withA(rp.a, () => { ctx.save(); ctx.translate(560 + sh, 860 + rp.y); shadow(30, 12, 'rgba(0,0,0,0.45)'); RR(-250, -80, 500, 160, 22, '#fff'); noShadow();
+    for (let i = 0; i < 5; i++) star(150 - i * 52, -30, 20, i < 1 ? C.gold : '#D5DBE4');
+    T('«ما أحد رد عليّ…»', 220, 34, { s: 30, w: 800, c: C.ink, f: 'Tajawal' }); T('تقييم 1 من 5', -230, -30, { s: 22, w: 700, c: C.red, al: 'left', f: 'Tajawal' }); ctx.restore(); });
+}
+
+// S3 — reveal: logo + one screen
+function s3(t) {
+  bg(t);
+  const b = pr(t, V(13.6) - 0.1, 1.2);
+  const land = V(14.0);
+  const gl = Math.exp(-Math.max(0, t - land) * 2.2) * (t > land ? 1 : 0);
+  // ring burst
+  if (t > land) { const q = pr(t, land, 0.9); ctx.save(); ctx.globalAlpha = 1 - q; ctx.strokeStyle = C.cyan; ctx.lineWidth = 4; dia(960, 430, 150 + q * 260, null, C.cyan, 3); ctx.restore(); }
+  logo(960, 430, 150, { build: b, glow: 0.6 + gl });
+  withA(eo(pr(t, land + 0.15, 0.5)), () => { wordmark(1080, 660, 64); T('شريك النمو الرقمي', 960, 730, { s: 30, w: 500, c: C.mut, al: 'center', f: 'Tajawal' }); });
+  const hp = pop(t, V(14.72), 0.6, 30);
+  withA(hp.a, () => { T('كل عملائكم في شاشة واحدة', 960, 860 + hp.y, { s: 72, w: 800, al: 'center' }); ctx.fillStyle = C.cyan; ctx.fillRect(960 - 110 * hp.a, 925 + hp.y, 220 * hp.a, 6); });
+}
+
+// ---- Dashboard (S4..S7) ----
+const MODS = [['chat', 'صندوق واتساب'], ['bot', 'المساعد الذكي'], ['device', 'طلبات الصيانة'], ['call', 'سجل المكالمات'], ['alert', 'الشكاوى'], ['cal', 'المواعيد'], ['branch', 'الفروع والصلاحيات'], ['chart', 'التقارير']];
+const ACT = [[0, 0], [V(19.2), 1], [V(24.44), 2], [V(31.28), 4], [V(33.36), 5], [V(36.24), 3], [V(38.4), 6], [V(41.65), 7]];
+const DX = 80, DY = 60, DW = 1760, DH = 960, SBW = 300; // window
+const CX0 = DX + 30, CX1 = DX + DW - SBW - 30, CY0 = DY + 120, CY1 = DY + DH - 30; // content box
+function activeIdx(t) { let a = 0, prev = 0, tt = 0; for (const [t0, i] of ACT) if (t >= t0) { prev = a; a = i; tt = t0; } return { a, prev, p: eo(pr(t, tt, 0.35)) }; }
+function dash(t, t0) {
+  bg(t);
+  const ap = pop(t, t0, 0.7, 40);
+  ctx.save(); ctx.translate(0, ap.y); ctx.globalAlpha *= ap.a;
+  shadow(80, 30, 'rgba(0,0,0,0.5)'); RR(DX, DY, DW, DH, 26, C.app); noShadow();
+  ctx.save(); ctx.beginPath(); ctx.roundRect(DX, DY, DW, DH, 26); ctx.clip();
+  // sidebar (right)
+  const sx = DX + DW - SBW; ctx.fillStyle = C.navy; ctx.fillRect(sx, DY, SBW, DH);
+  wordmark(sx + SBW - 34, DY + 60, 36); T('CRM', sx + 40, DY + 62, { s: 22, w: 600, c: C.cyan, al: 'left', ls: 3 });
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(sx + 24, DY + 108, SBW - 48, 1.5);
+  const { a, prev, p } = activeIdx(t);
+  const iy = (i) => DY + 160 + i * 84;
+  const hy = lerp(iy(prev), iy(a), p);
+  RR(sx + 16, hy - 32, SBW - 32, 64, 14, 'rgba(85,214,230,0.14)'); ctx.fillStyle = C.cyan; ctx.fillRect(sx + SBW - 20, hy - 22, 5, 44);
+  MODS.forEach(([ic, name], i) => { const on = i === a; const c = on ? C.white : '#93A3BA';
+    icon(ic, sx + SBW - 60, iy(i), 30, on ? C.cyan : '#6F819B', 2.5); T(name, sx + SBW - 96, iy(i) + 2, { s: 25, w: on ? 800 : 500, c, f: 'Tajawal' }); });
+  T('مؤسسة الأثير الماسي', sx + SBW / 2, DY + DH - 60, { s: 21, w: 700, c: '#93A3BA', al: 'center', f: 'Tajawal' });
+  // top bar
+  ctx.fillStyle = '#fff'; ctx.fillRect(DX, DY, DW - SBW, 92); ctx.fillStyle = C.line; ctx.fillRect(DX, DY + 92, DW - SBW, 2);
+  const title = MODS[a][1];
+  withA(p, () => T(title, CX1, DY + 48, { s: 36, w: 800, c: C.ink }));
+  RR(DX + 30, DY + 24, 380, 46, 23, C.app); T('بحث عن عميل أو جهاز…', DX + 390, DY + 48, { s: 20, w: 500, c: C.mut, f: 'Tajawal' });
+  ctx.beginPath(); ctx.arc(DX + 450, DY + 47, 22, 0, 7); ctx.fillStyle = C.teal; ctx.fill(); T('أ', DX + 450, DY + 49, { s: 22, w: 800, al: 'center' });
+  // content
+  for (const [a0, a1, fn] of DCONT) { if (t < a0 - 0.01 || t > a1 + 0.5) continue;
+    const fi = eo(pr(t, a0 + 0.22, 0.4)), fo = 1 - eo(pr(t, a1, 0.22)); const al = Math.min(fi, fo); if (al <= 0) continue;
+    ctx.save(); ctx.globalAlpha *= al; ctx.translate((1 - fi) * -40 + (1 - fo) * 40, 0); fn(t); ctx.restore(); }
+  ctx.restore(); ctx.restore();
+}
+function card(x, y, w, h, o = {}) { ctx.save(); shadow(o.sb ?? 24, 8, 'rgba(15,27,46,0.10)'); RR(x, y, w, h, o.r || 20, o.bg || C.card); noShadow(); if (o.stroke) RR(x, y, w, h, o.r || 20, null, o.stroke, 2); ctx.restore(); }
+function chip(xr, y, s, bgc, fg, o = {}) { const w = TW(s, { s: o.s || 20, w: 700, f: 'Tajawal' }) + 32; RR(xr - w, y - 18, w, 36, 18, bgc); T(s, xr - 16, y + 1, { s: o.s || 20, w: 700, c: fg, f: 'Tajawal' }); return w; }
+function bubble(side, xL, xR, y, text, o = {}) { // side 'in' (right) / 'out' (left)
+  const s = o.s || 24; const w = Math.min(o.max || 560, TW(text, { s, w: 500, f: 'Tajawal' }) + 44), h = 62;
+  const x = side === 'in' ? xR - w : xL;
+  ctx.save(); shadow(8, 3, 'rgba(15,27,46,0.08)'); RR(x, y, w, h, 18, side === 'in' ? '#fff' : (o.bg || C.bubble)); noShadow(); ctx.restore();
+  T(text, x + w - 22, y + h / 2 + 1, { s, w: 500, c: C.ink, f: 'Tajawal' });
+  if (o.label) T(o.label, side === 'in' ? x + w : x + w, y - 16, { s: 17, w: 700, c: o.lc || C.mut, f: 'Tajawal', al: 'right' });
+  if (o.time) T(o.time, side === 'in' ? x - 12 : x + w + 12, y + h - 14, { s: 16, w: 500, c: C.mut, al: side === 'in' ? 'right' : 'left' });
+  return h;
+}
+// S4 content: inbox + AI
+function cInbox(t) {
+  // list column (right)
+  const lx1 = CX1, lx0 = CX1 - 420;
+  card(lx0, CY0, 420, CY1 - CY0);
+  waIcon(lx1 - 40, CY0 + 44, 18); T('واتساب الأعمال · رقم موحّد', lx1 - 70, CY0 + 46, { s: 22, w: 800, c: C.ink, f: 'Tajawal' });
+  const L = [['عميل جديد', 'كم تغيير شاشة جوالي؟', '11:02', 'الفرع الرئيسي', 'المساعد', 1], ['أبو فهد', 'متى يجهز جهازي؟', '10:48', 'فرع 2', 'أحمد', 0], ['نورة', 'عندكم تقسيط؟', '10:31', 'الفرع الرئيسي', 'المساعد', 0], ['محمد', 'وين موقعكم بالضبط؟', '9:57', 'فرع 3', 'المساعد', 0], ['ريم', 'شكراً، وصلني الإشعار', '9:40', 'فرع 2', 'سارة', 0], ['سلطان', 'أبي أحجز موعد صيانة', '9:12', 'الفرع الرئيسي', 'أحمد', 0]];
+  L.forEach(([n, m, tm, br, ag, sel], i) => { const p = pop(t, V(16.83) + 0.1 + i * 0.12, 0.4, 20); const y = CY0 + 90 + i * 108 + p.y;
+    withA(p.a, () => { if (sel) RR(lx0 + 10, y, 400, 98, 14, '#E9F7F9'); ctx.beginPath(); ctx.arc(lx1 - 48, y + 49, 28, 0, 7); ctx.fillStyle = ['#0E7C8C', '#B2702E', '#6C5BA8', '#2E7D5B', '#C2527A', '#3B6EA8'][i]; ctx.fill();
+      T(n[0], lx1 - 48, y + 51, { s: 24, w: 800, al: 'center' });
+      T(n, lx1 - 90, y + 30, { s: 22, w: 800, c: C.ink, f: 'Tajawal' }); T(m, lx1 - 90, y + 62, { s: 19, w: 500, c: C.ink2, f: 'Tajawal' });
+      T(tm, lx0 + 24, y + 30, { s: 16, w: 500, c: C.mut, al: 'left' });
+      T(br + ' · ' + ag, lx0 + 24 + TW(br + ' · ' + ag, { s: 16, w: 700, f: 'Tajawal' }), y + 64, { s: 16, w: 700, c: ag === 'المساعد' ? C.teal : C.amber, f: 'Tajawal' });
+      ctx.fillStyle = C.line; ctx.fillRect(lx0 + 20, y + 102, 380, 1); }); });
+  // chat pane
+  const cx0 = CX0, cx1 = lx0 - 24;
+  card(cx0, CY0, cx1 - cx0, CY1 - CY0, { bg: '#EEF2F5' });
+  RR(cx0, CY0, cx1 - cx0, 84, [20, 20, 0, 0], '#fff');
+  ctx.beginPath(); ctx.arc(cx1 - 50, CY0 + 42, 26, 0, 7); ctx.fillStyle = C.teal; ctx.fill(); T('ع', cx1 - 50, CY0 + 44, { s: 24, w: 800, al: 'center' });
+  T('عميل جديد', cx1 - 92, CY0 + 30, { s: 24, w: 800, c: C.ink, f: 'Tajawal' }); T('واتساب · الفرع الرئيسي', cx1 - 92, CY0 + 60, { s: 17, w: 500, c: C.mut, f: 'Tajawal' });
+  const hand = pr(t, V(22.32), 0.4);
+  if (hand < 1) withA(1 - hand, () => { const w = chip(cx0 + 300, CY0 + 42, 'يرد الآن: المساعد الذكي', C.teal, '#fff'); icon('bot', cx0 + 300 - w - 22, CY0 + 42, 26, C.teal, 2.5); });
+  if (hand > 0) withA(hand, () => chip(cx0 + 300, CY0 + 42, 'يرد الآن: أحمد · مبيعات', C.amber, '#fff'));
+  const xL = cx0 + 30, xR = cx1 - 30; let y = CY0 + 130;
+  const msgs = [[V(19.2), 'in', 'السلام عليكم، كم تغيير شاشة جوالي؟', { time: '11:02 PM' }], [V(20.16), 'out', 'وعليكم السلام، حيّاك! وش نوع جوالك؟ أرسل لك السعر التقريبي', { label: 'المساعد الذكي', lc: C.teal, max: 900 }],
+    [V(21.12), 'in', 'آيفون 14 برو، وبكرة الصبح يناسبني', {}], [V(21.68), 'out', 'تم ✓ حجزت لك موعد بكرة 10:00 ص بالفرع الرئيسي', { label: 'المساعد الذكي', lc: C.teal, max: 900 }]];
+  msgs.forEach(([t0, side, txt, o], i) => { const p = pop(t, t0, 0.35, 16);
+    if (side === 'out') { const tp = pr(t, t0 - 0.55, 0.55); if (tp > 0 && tp < 1) withA(Math.sin(tp * Math.PI) * 1.5, () => { RR(xL, y, 96, 50, 18, C.bubble); for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(xL + 28 + k * 20, y + 25 + Math.sin(t * 12 + k) * 4, 5, 0, 7); ctx.fillStyle = C.teal; ctx.fill(); } }); }
+    withA(p.a, () => { ctx.save(); ctx.translate(0, p.y); bubble(side, xL, xR, y + (o.label ? 14 : 0), txt, o); ctx.restore(); });
+    y += o.label ? 104 : 86; });
+  // handoff system chip
+  withA(hand, () => { const w = 520; RR((cx0 + cx1) / 2 - w / 2, y + 10, w, 50, 25, '#FFF3E4', '#E9C79E', 1.5); T('تم تحويل المحادثة إلى موظف: أحمد', (cx0 + cx1) / 2, y + 36, { s: 21, w: 700, c: C.amber, al: 'center', f: 'Tajawal' }); });
+  // 24/7 badge
+  const bp = pop(t, V(21.44), 0.45, 0);
+  withA(bp.a, () => { ctx.save(); ctx.translate(cx0 + 150, CY1 - 70); ctx.scale(bp.s, bp.s); shadow(20, 8, 'rgba(15,27,46,0.25)'); RR(-120, -36, 240, 72, 36, C.navy); noShadow(); icon('moon', 72, 0, 34, C.cyan); T('24/7', 32, 2, { s: 30, w: 600, c: '#fff', al: 'right' }); T('يرد', -60, 2, { s: 22, w: 700, c: C.cyan, f: 'Tajawal', al: 'center' }); ctx.restore(); });
+}
+// S5 content: repair tickets
+const STG = ['مستلم', 'قيد الفحص', 'قيد الإصلاح', 'جاهز', 'تم التسليم'];
+const STG_T = [V(27.76), V(28.4), V(29.0), V(29.6), V(30.4)];
+const STG_N = ['استلمنا جهازك، رقم الطلب #1048', 'جهازك الآن قيد الفحص', 'بدأ الفني بإصلاح جهازك', 'جهازك جاهز للاستلام ✓', 'تم التسليم، شكراً لثقتك'];
+function cRepair(t) {
+  const x0 = 700, x1 = CX1;
+  card(x0, CY0, x1 - x0, 530);
+  icon('device', x1 - 50, CY0 + 50, 40, C.teal, 3);
+  T('طلب صيانة #1048', x1 - 90, CY0 + 52, { s: 32, w: 800, c: C.ink });
+  let stage = -1; STG_T.forEach((s, i) => { if (t >= s) stage = i; });
+  const stName = stage < 0 ? 'مستلم' : STG[stage];
+  chip(x0 + 30 + TW(stName, { s: 20, w: 700, f: 'Tajawal' }) + 32, CY0 + 52, stName, stage >= 3 ? '#DDF5E6' : '#E6F4F6', stage >= 3 ? C.greenD : C.teal);
+  ctx.fillStyle = C.line; ctx.fillRect(x0 + 30, CY0 + 96, x1 - x0 - 60, 2);
+  const rows = [['الجهاز', 'iPhone 14 Pro', V(24.56)], ['العطل', 'شاشة مكسورة', V(25.84)], ['الفني المسؤول', 'م. خالد', V(26.48)], ['الفرع', 'الفرع الرئيسي', V(27.12)], ['ضمان الصيانة', 'مسجّل على الجهاز ✓', V(27.3)]];
+  rows.forEach(([k, v, t0], i) => { const p = pop(t, t0, 0.4, 12), y = CY0 + 140 + i * 76;
+    const hl = Math.max(0, 1 - Math.abs(t - t0 - 0.3) / 0.6);
+    withA(p.a, () => { if (hl > 0) RR(x0 + 20, y - 30, x1 - x0 - 40, 62, 12, `rgba(85,214,230,${0.18 * hl})`);
+      T(k, x1 - 40, y + p.y, { s: 25, w: 500, c: C.mut, f: 'Tajawal' }); T(v, x0 + 50 + TW(v, { s: 27, w: 800, f: AR.test(v) ? 'Tajawal' : 'Montserrat' }), y + p.y, { s: 27, w: 800, c: C.ink, f: AR.test(v) ? 'Tajawal' : 'Montserrat', w: AR.test(v) ? 800 : 600 }); }); });
+  // pipeline
+  const py = CY0 + 640, px1 = x1 - 90, px0 = x0 + 100, n = 5, gap = (px1 - px0) / (n - 1);
+  card(x0, CY0 + 560, x1 - x0, CY1 - CY0 - 560);
+  ctx.fillStyle = C.line; ctx.fillRect(px0, py - 3, px1 - px0, 6);
+  const prog = stage < 0 ? 0 : Math.min(n - 1, stage + 0) - (1 - eo(pr(t, STG_T[Math.max(0, stage)], 0.4)));
+  ctx.fillStyle = C.teal; ctx.fillRect(px1 - Math.max(0, prog) * gap, py - 3, Math.max(0, prog) * gap, 6);
+  STG.forEach((s, i) => { const x = px1 - i * gap, on = i <= stage, cur = i === stage; const b = on ? back(pr(t, STG_T[i], 0.4)) : 0;
+    ctx.beginPath(); ctx.arc(x, py, 22, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = on ? C.teal : '#C9D2DE'; ctx.stroke();
+    if (on) { ctx.beginPath(); ctx.arc(x, py, 22 * b, 0, 7); ctx.fillStyle = i === 4 ? C.navy : C.teal; ctx.fill(); icon('check', x, py, 22, '#fff', 3.5); }
+    if (cur) { ctx.save(); ctx.globalAlpha = 0.4 * (1 - ((t * 1.2) % 1)); ctx.beginPath(); ctx.arc(x, py, 22 + ((t * 1.2) % 1) * 22, 0, 7); ctx.strokeStyle = C.teal; ctx.lineWidth = 3; ctx.stroke(); ctx.restore(); }
+    T(s, x, py + 56, { s: 24, w: on ? 800 : 500, c: on ? C.ink : C.mut, al: 'center', f: 'Tajawal' }); });
+  // phone with WhatsApp notifications
+  phone(370, (CY0 + CY1) / 2 + 10, 360, 760, (x, y, w, h) => {
+    ctx.fillStyle = '#ECE5DD'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = C.greenD; ctx.fillRect(x, y, w, 110); T('مؤسسة الأثير الماسي', x + w - 24, y + 72, { s: 21, w: 800, f: 'Tajawal' }); T('حساب أعمال موثّق', x + w - 24, y + 98, { s: 15, w: 500, c: '#CFEBDC', f: 'Tajawal' });
+    STG_N.forEach((s, i) => { const p = pop(t, STG_T[i] + 0.1, 0.4, 14); withA(p.a, () => { const yy = y + 140 + i * 104 + p.y; ctx.save(); shadow(6, 2, 'rgba(0,0,0,0.08)'); RR(x + 18, yy, w - 36, 88, 14, '#fff'); noShadow(); ctx.restore();
+      T(STG[i], x + w - 36, yy + 28, { s: 17, w: 800, c: i >= 3 ? C.greenD : C.teal, f: 'Tajawal' }); T(s, x + w - 36, yy + 60, { s: 17, w: 500, c: C.ink, f: 'Tajawal' }); }); });
+  });
+  // emphasis pulse label
+  const ep = pop(t, V(29.3), 0.4, 10);
+  withA(ep.a * (1 - pr(t, V(31.1), 0.4)), () => { ctx.save(); shadow(18, 6, 'rgba(15,27,46,0.25)'); RR(170, CY0 - 20, 400, 52, 26, C.green); noShadow(); ctx.restore(); T('إشعار تلقائي للعميل', 370, CY0 + 7, { s: 23, w: 800, c: '#fff', al: 'center', f: 'Tajawal' }); });
+}
+// S6 content: complaints / appointments / calls
+function cOps(t) {
+  const cw = (CX1 - CX0 - 60) / 3, cols = [CX1 - cw, CX1 - 2 * cw - 30, CX0];
+  const hdr = (x, ic, title, col) => { icon(ic, x + cw - 46, CY0 + 50, 34, col, 3); T(title, x + cw - 82, CY0 + 52, { s: 30, w: 800, c: C.ink }); ctx.fillStyle = C.line; ctx.fillRect(x + 24, CY0 + 96, cw - 48, 2); };
+  // complaints
+  const p1 = pop(t, V(31.28), 0.5, 40); withA(p1.a, () => { ctx.save(); ctx.translate(0, p1.y); const x = cols[0]; card(x, CY0, cw, CY1 - CY0); hdr(x, 'alert', 'الشكاوى', C.red);
+    RR(x + 24, CY0 + 124, cw - 48, 250, 16, '#FBF7F2', '#EFE2D2', 1.5);
+    T('تأخر في تسليم جهاز', x + cw - 48, CY0 + 162, { s: 25, w: 800, c: C.ink, f: 'Tajawal' });
+    T('التصنيف: تأخير', x + cw - 48, CY0 + 202, { s: 20, w: 500, c: C.ink2, f: 'Tajawal' }); T('المسؤول: سارة', x + cw - 48, CY0 + 236, { s: 20, w: 500, c: C.ink2, f: 'Tajawal' }); T('مدة الحل: 24 ساعة', x + cw - 48, CY0 + 270, { s: 20, w: 500, c: C.ink2, f: 'Tajawal' });
+    const st = ['مفتوحة', 'قيد المعالجة', 'مغلقة ✓'], ts = [V(31.28), V(31.9), V(32.72)]; let k = 0; ts.forEach((s, i) => { if (t >= s) k = i; });
+    const col = [C.red, C.amber, C.greenD][k], bgc = ['#FDE7EA', '#FFF1DE', '#DDF5E6'][k];
+    const sb = back(pr(t, ts[k], 0.35)); ctx.save(); ctx.translate(x + 140, CY0 + 330); ctx.scale(sb, sb); chip(70, 0, st[k], bgc, col, { s: 21 }); ctx.restore();
+    const f1 = pop(t, V(32.9), 0.4, 12), f2 = pop(t, V(33.2), 0.4, 12);
+    withA(f1.a, () => { RR(x + 24, CY0 + 400 + f1.y, cw - 48, 70, 14, '#EEF8F2'); waIcon(x + cw - 60, CY0 + 435 + f1.y, 16); T('رسالة متابعة للعميل بعد الحل', x + cw - 88, CY0 + 437 + f1.y, { s: 20, w: 700, c: C.greenD, f: 'Tajawal' }); });
+    withA(f2.a, () => { RR(x + 24, CY0 + 490 + f2.y, cw - 48, 110, 14, '#FFF8E6'); T('طلب تقييم على خرائط جوجل', x + cw - 48, CY0 + 524 + f2.y, { s: 20, w: 700, c: C.amber, f: 'Tajawal' }); for (let i = 0; i < 5; i++) { const sp = back(pr(t, V(33.2) + 0.2 + i * 0.08, 0.3)); if (sp > 0) star(x + cw - 64 - i * 44, CY0 + 568 + f2.y, 17 * sp, C.gold); } });
+    ctx.restore(); });
+  // appointments
+  const p2 = pop(t, V(33.36), 0.5, 40); withA(p2.a, () => { ctx.save(); ctx.translate(0, p2.y); const x = cols[1]; card(x, CY0, cw, CY1 - CY0); hdr(x, 'cal', 'المواعيد', C.teal);
+    const days = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س']; const gx1 = x + cw - 50, cs = (cw - 100) / 7;
+    days.forEach((d, i) => T(d, gx1 - i * cs - cs / 2 + 10, CY0 + 136, { s: 19, w: 700, c: C.mut, al: 'center', f: 'Tajawal' }));
+    const booked = [3, 8, 10, 15, 17, 22, 26], today = 12;
+    for (let i = 0; i < 28; i++) { const cx = gx1 - (i % 7) * cs - cs / 2 + 10, cy = CY0 + 180 + Math.floor(i / 7) * 52; const bk = booked.includes(i) && t > V(33.36) + 0.3 + i * 0.02;
+      if (i === today) { const tb = back(pr(t, V(34.0), 0.4)); ctx.beginPath(); ctx.arc(cx, cy, 21 * Math.max(0.0001, tb), 0, 7); ctx.fillStyle = C.teal; ctx.fill(); }
+      T(String(i + 1), cx, cy + 1, { s: 19, w: 600, c: i === today && t > V(34.0) ? '#fff' : C.ink, al: 'center' });
+      if (bk) { ctx.beginPath(); ctx.arc(cx, cy + 19, 3.5, 0, 7); ctx.fillStyle = C.amber; ctx.fill(); } }
+    const sl = [['10:00 ص', 'استلام جهاز · الفرع الرئيسي'], ['1:30 م', 'موعد صيانة · فرع 2']];
+    sl.forEach(([h, d], i) => { const p = pop(t, V(34.0) + 0.15 * i, 0.4, 12); withA(p.a, () => { const y = CY0 + 400 + i * 74 + p.y; RR(x + 24, y, cw - 48, 62, 12, '#F1F7F8'); ctx.fillStyle = C.teal; ctx.fillRect(x + cw - 30, y + 12, 4, 38); T(d, x + cw - 46, y + 32, { s: 20, w: 700, c: C.ink, f: 'Tajawal' }); T(h, x + 40, y + 32, { s: 20, w: 800, c: C.teal, al: 'left', f: 'Tajawal' }); }); });
+    const bp = pop(t, V(34.56), 0.45, -20); withA(bp.a, () => { const y = CY0 + 570 + bp.y; ctx.save(); shadow(18, 8, 'rgba(15,27,46,0.18)'); RR(x + 24, y, cw - 48, 92, 16, C.navy); noShadow(); ctx.restore();
+      const sw = Math.sin((t - V(34.56)) * 14) * 0.25 * Math.exp(-(t - V(34.56)) * 2.5); ctx.save(); ctx.translate(x + cw - 64, y + 46); ctx.rotate(sw); icon('bell', 0, 0, 34, C.cyan, 3); ctx.restore();
+      T('تذكير تلقائي للعميل', x + cw - 100, y + 30, { s: 20, w: 800, c: C.cyan, f: 'Tajawal' }); T('موعدك بكرة 10:00 ص، ننتظرك', x + cw - 100, y + 64, { s: 19, w: 500, c: '#fff', f: 'Tajawal' }); });
+    ctx.restore(); });
+  // calls
+  const p3 = pop(t, V(36.24), 0.5, 40); withA(p3.a, () => { ctx.save(); ctx.translate(0, p3.y); const x = cols[2]; card(x, CY0, cw, CY1 - CY0); hdr(x, 'call', 'سجل المكالمات', C.teal);
+    const calls = [['أبو فهد', 'استفسار عن حالة الجهاز', 'متابعة: الأحد', '3:12'], ['نورة', 'طلب عرض سعر شاشة', 'تم الرد ✓', '1:45'], ['سلطان', 'حجز موعد صيانة', 'متابعة: اليوم 6 م', '2:08']];
+    calls.forEach(([n, note, f, d], i) => { const p = pop(t, V(36.4) + i * 0.25, 0.4, 14); withA(p.a, () => { const y = CY0 + 124 + i * 150 + p.y;
+      RR(x + 24, y, cw - 48, 134, 14, '#F6F8FB'); T(n, x + cw - 48, y + 32, { s: 23, w: 800, c: C.ink, f: 'Tajawal' }); T(d, x + 48, y + 32, { s: 19, w: 600, c: C.mut, al: 'left' });
+      T('ملاحظة: ' + note, x + cw - 48, y + 70, { s: 19, w: 500, c: C.ink2, f: 'Tajawal' }); T(f, x + cw - 48, y + 104, { s: 19, w: 700, c: C.amber, f: 'Tajawal' }); }); });
+    const rp = pop(t, V(37.52), 0.4, 10); withA(rp.a, () => { const y = CY0 + 600; RR(x + 24, y, cw - 48, 60, 30, '#E6F4F6'); ctx.beginPath(); ctx.arc(x + cw - 60, y + 30, 9, 0, 7); ctx.fillStyle = C.red; ctx.globalAlpha *= 0.6 + 0.4 * Math.sin(t * 6); ctx.fill(); ctx.globalAlpha = rp.a; T('كل المكالمات مسجّلة بملاحظاتها', x + cw - 84, y + 31, { s: 20, w: 800, c: C.teal, f: 'Tajawal' }); });
+    ctx.restore(); });
+}
+// S7 content: branches + reports
+function cReports(t) {
+  // branches panel (left)
+  const bx0 = CX0, bx1 = CX0 + 560; card(bx0, CY0, bx1 - bx0, CY1 - CY0);
+  T('الفروع والصلاحيات', bx1 - 32, CY0 + 50, { s: 28, w: 800, c: C.ink });
+  const hx = (bx0 + bx1) / 2, hy = CY0 + 300; const nodes = [[hx, CY0 + 150, 'الفرع الرئيسي'], [bx0 + 110, CY0 + 430, 'فرع 2'], [bx1 - 110, CY0 + 430, 'فرع 3']];
+  nodes.forEach(([x, y, n], i) => { const lp = eo(pr(t, V(38.6) + i * 0.15, 0.5)); ctx.strokeStyle = C.teal; ctx.lineWidth = 3; ctx.setLineDash([8, 8]); ctx.lineDashOffset = -t * 30; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(lerp(hx, x, lp), lerp(hy, y, lp)); ctx.stroke(); ctx.setLineDash([]); });
+  ctx.save(); shadow(20, 8, 'rgba(15,27,46,0.2)'); ctx.beginPath(); ctx.arc(hx, hy, 70, 0, 7); ctx.fillStyle = C.navy; ctx.fill(); noShadow(); ctx.restore(); logo(hx, hy, 42);
+  nodes.forEach(([x, y, n], i) => { const p = back(pr(t, V(38.6) + 0.35 + i * 0.15, 0.4)); if (p <= 0) return; ctx.save(); ctx.translate(x, y); ctx.scale(p, p); const bw2 = TW(n, { s: 21, w: 800, f: 'Tajawal' }) + 96; RR(-bw2 / 2, -34, bw2, 68, 34, '#fff', C.teal, 2.5); icon('branch', bw2 / 2 - 34, 0, 26, C.teal, 2.5); T(n, bw2 / 2 - 58, 2, { s: 21, w: 800, c: C.ink, f: 'Tajawal' }); ctx.restore(); });
+  const roles = [['مدير', C.navy], ['موظف مبيعات', C.teal], ['فني صيانة', C.amber]];
+  let rx = bx1 - 36; roles.forEach(([r, c], i) => { const p = pop(t, V(40.0) + i * 0.18, 0.35, 10); withA(p.a, () => { ctx.save(); ctx.translate(0, p.y); const w = TW(r, { s: 21, w: 700, f: 'Tajawal' }) + 70; RR(rx - w, CY0 + 560, w, 50, 25, c); icon('lock', rx - 26, CY0 + 585, 20, '#fff', 2); T(r, rx - 46, CY0 + 586, { s: 21, w: 700, c: '#fff', f: 'Tajawal' }); ctx.restore(); rx -= w + 12; }); if (p.a <= 0) rx -= TW(r, { s: 21, w: 700, f: 'Tajawal' }) + 82; });
+  T('كل موظف يشوف اللي يخصّه بس', bx1 - 36, CY0 + 660, { s: 20, w: 500, c: C.mut, f: 'Tajawal', a: eo(pr(t, V(40.5), 0.4)) });
+  // reports (right)
+  const rx0 = bx1 + 30, rx1 = CX1, kw = (rx1 - rx0 - 40) / 3;
+  const kp = [['متوسط زمن الرد', V(42.93), (q) => String(Math.round(lerp(0, 45, q))), 'ثانية'], ['طلبات الصيانة', V(43.7), (q) => String(Math.round(lerp(0, 38, q)))], ['شكاوى مغلقة', V(44.0), (q) => `${Math.round(lerp(0, 96, q))}%`]];
+  kp.forEach(([k, t0, f, unit], i) => { const p = pop(t, t0 - 0.2, 0.45, 20), x = rx1 - (i + 1) * kw - i * 20; withA(p.a, () => { ctx.save(); ctx.translate(0, p.y); card(x, CY0, kw, 200); T(k, x + kw - 28, CY0 + 46, { s: 21, w: 700, c: C.mut, f: 'Tajawal' });
+    const s = f(eo(pr(t, t0, 1.0))); const sw2 = T(s, x + kw - 28, CY0 + 120, { s: 64, w: 900, c: i === 0 ? C.teal : C.ink, f: 'Cairo' }); if (unit) T(unit, x + kw - 40 - sw2, CY0 + 132, { s: 24, w: 700, c: C.teal, f: 'Tajawal' });
+    ctx.strokeStyle = i === 0 ? C.cyan : '#C9D2DE'; ctx.lineWidth = 3; ctx.beginPath(); for (let j = 0; j <= 20; j++) { const xx = x + 28 + j * (kw - 56) / 20, yy = CY0 + 172 - (Math.sin(j * 0.7 + i) * 0.5 + 0.5 + j * 0.03) * 22 * eo(pr(t, t0, 1)); j ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke(); ctx.restore(); }); });
+  // employees chart
+  const pc = pop(t, V(44.4) - 0.2, 0.45, 20); withA(pc.a, () => { ctx.save(); ctx.translate(0, pc.y); const y0 = CY0 + 230; card(rx0, y0, rx1 - rx0, CY1 - y0);
+    T('أداء الموظفين', rx1 - 32, y0 + 50, { s: 26, w: 800, c: C.ink }); T('محادثات مغلقة هذا الأسبوع', rx1 - 32, y0 + 88, { s: 19, w: 500, c: C.mut, f: 'Tajawal' });
+    const E = [['أحمد', 0.86], ['سارة', 0.78], ['م. خالد', 0.64], ['ريم', 0.55], ['فهد', 0.42]];
+    E.forEach(([n, v], i) => { const q = eo(pr(t, V(44.4) + i * 0.1, 0.8)), y = y0 + 150 + i * 72, bw = (rx1 - rx0 - 240) * v * q;
+      T(n, rx1 - 32, y, { s: 22, w: 700, c: C.ink, f: 'Tajawal' }); RR(rx1 - 170 - (rx1 - rx0 - 240), y - 16, rx1 - rx0 - 240, 32, 16, '#EEF2F6'); RR(rx1 - 170 - bw, y - 16, Math.max(1, bw), 32, 16, i === 0 ? C.teal : C.teal2);
+      T(String(Math.round(v * 100 * q)), rx1 - 182 - bw, y + 1, { s: 18, w: 600, c: C.ink2, al: 'right' }); });
+    T('* أرقام توضيحية', rx0 + 28, CY1 - 28, { s: 16, w: 500, c: C.mut, al: 'left', f: 'Tajawal' }); ctx.restore(); });
+}
+const DCONT = [[V(16.75) - 0.2, V(24.3), cInbox], [V(24.3), V(31.22) - 0.1, cRepair], [V(31.22) - 0.1, V(38.3), cOps], [V(38.3), 99, cReports]];
+
+// S8 — customer journey
+function s8(t) {
+  bg(t);
+  withA(eo(pr(t, V(45.84) - 0.3, 0.5)), () => { eyebrow('رحلة العميل بعد النظام', 1780, 140); T('من رسالة الساعة 11 ليلاً… إلى عميل دائم', 1780, 210, { s: 58, w: 800 }); });
+  const steps = [[V(46.28), 'chat', 'رسالة 11 ليلاً', 'العميل يسأل على واتساب عن تغيير شاشة جواله'], [V(47.7), 'bot', 'رد فوري وموعد', 'المساعد الذكي يرد ويحجز موعداً بالفرع الأقرب'], [V(48.96), 'device', 'استلام مسجّل', 'يُسجَّل الجهاز ويصل العميل إشعار بالاستلام'],
+    [V(49.8), 'bell', 'جهازك جاهز', 'إشعار تلقائي عند انتهاء الإصلاح دون أن يتصل'], [V(51.6), 'star', 'عميل دائم', 'طلب تقييم بعد التسليم، ويُحفظ في قائمة العملاء']];
+  const cw = 300, gap = 30, x1 = 1780, y0 = 400;
+  // connecting line
+  const last = steps.reduce((k, s, i) => t >= s[0] ? i : k, -1);
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x1 - cw / 2 - 4 * (cw + gap), 330, 4 * (cw + gap), 4);
+  if (last >= 0) { const prog = last + 0 - (1 - eo(pr(t, steps[last][0], 0.5))); ctx.fillStyle = C.cyan; ctx.fillRect(x1 - cw / 2 - Math.max(0, prog) * (cw + gap), 330, Math.max(0, prog) * (cw + gap), 4); }
+  steps.forEach(([t0, ic, title, desc], i) => { const x = x1 - (i + 1) * cw - i * gap, p = pop(t, t0, 0.5, 30), on = t >= t0, fin = i === 4;
+    dia(x + cw / 2, 332, on ? 14 : 10, on ? C.cyan : '#2A3B57');
+    withA(0.35 + 0.65 * p.a, () => { ctx.save(); ctx.translate(0, p.y);
+      if (fin && on) { const g = ctx.createRadialGradient(x + cw / 2, y0 + 170, 0, x + cw / 2, y0 + 170, 300); g.addColorStop(0, `rgba(85,214,230,${0.25 * p.a})`); g.addColorStop(1, 'rgba(85,214,230,0)'); ctx.fillStyle = g; ctx.fillRect(x - 150, y0 - 130, cw + 300, 600); }
+      RR(x, y0, cw, 340, 22, fin && on ? C.cream : (on ? '#14253E' : 'rgba(255,255,255,0.04)'), on ? (fin ? null : 'rgba(85,214,230,0.45)') : 'rgba(255,255,255,0.08)', 2);
+      const tc = fin && on ? C.ink : C.white;
+      T(String(i + 1), x + cw - 30, y0 + 50, { s: 40, w: 600, c: fin && on ? C.teal : C.cyan });
+      icon(ic, x + 56, y0 + 52, 40, fin && on ? C.gold : (on ? C.cyan : '#4A5B76'), 3);
+      T(title, x + cw - 30, y0 + 130, { s: 32, w: 800, c: tc });
+      wrap(desc, x + cw - 30, y0 + 190, cw - 56, 40, { s: 23, w: 500, c: fin && on ? C.ink2 : '#B6C3D6', f: 'Tajawal' });
+      if (fin && on) for (let k = 0; k < 5; k++) { const sp = back(pr(t, t0 + 0.2 + k * 0.08, 0.3)); if (sp > 0) star(x + cw - 44 - k * 46, y0 + 300, 16 * sp, C.gold); }
+      ctx.restore(); });
+  });
+  // "جهازك جاهز" big toast
+  const tp = pop(t, V(50.4), 0.45, -30); withA(tp.a * (1 - pr(t, V(52.2), 0.4)), () => { notif(660, 840 + tp.y, 600, 'مؤسسة الأثير الماسي', 'جهازك جاهز للاستلام ✓', 'الآن', 1, { h: 112 }); });
+}
+function wrap(s, xr, y, maxw, lh, o) { const words = s.split(' '); let line = '', yy = y; for (const w of words) { const test = line ? line + ' ' + w : w; if (TW(test, o) > maxw && line) { T(line, xr, yy, o); line = w; yy += lh; } else line = test; } if (line) T(line, xr, yy, o); }
+
+// S9 — 3 weeks
+function s9(t) {
+  bg(t);
+  const hp = pop(t, V(52.96), 0.5, 20);
+  withA(hp.a, () => { eyebrow('المنهجية والجدول الزمني', 1780, 170 + hp.y); T('التسليم خلال 3 أسابيع', 1780, 245 + hp.y, { s: 72, w: 800 }); });
+  const W3 = [[V(54.32), 'الأسبوع الأول', 'التحليل والربط', 'جلسة تحليل الاحتياجات، ربط واتساب، بناء قاعدة العملاء والفروع'], [V(55.36), 'الأسبوع الثاني', 'بناء الوحدات', 'الصيانة والشكاوى والمكالمات والمواعيد، وتدريب المساعد الذكي'], [V(56.56), 'الأسبوع الثالث', 'التشغيل', 'التقارير والاختبار، تدريب الفريق، والتشغيل الفعلي']];
+  const lx1 = 1700, lx0 = 220, ly = 480, xs = [1560, 960, 360];
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(lx0, ly - 2, lx1 - lx0, 4);
+  const fp = eo(pr(t, V(54.0), V(57.6) - V(54.0))); ctx.fillStyle = C.cyan; ctx.fillRect(lx1 - (lx1 - lx0) * fp, ly - 2, (lx1 - lx0) * fp, 4);
+  W3.forEach(([t0, wk, ti, ds], i) => { const p = pop(t, t0, 0.5, 24), x = xs[i];
+    const b = back(pr(t, t0, 0.4)); dia(x, ly, 26 * Math.max(0.5, b), t >= t0 ? C.teal : '#2A3B57'); if (t >= t0) dia(x, ly, 12 * b, C.cyan);
+    withA(p.a, () => { ctx.save(); ctx.translate(0, p.y); RR(x - 260, ly + 60, 520, 300, 22, '#14253E', 'rgba(85,214,230,0.3)', 2);
+      T(wk, x + 230, ly + 110, { s: 28, w: 800, c: C.cyan }); T(ti, x + 230, ly + 168, { s: 40, w: 800 }); wrap(ds, x + 230, ly + 230, 460, 44, { s: 25, w: 500, c: '#B6C3D6', f: 'Tajawal' }); ctx.restore(); }); });
+  withA(eo(pr(t, V(57.52), 0.5)), () => { T('من استلام الدفعة الأولى وبيانات الربط', 960, 960, { s: 26, w: 500, c: C.mut, al: 'center', f: 'Tajawal' }); });
+}
+
+// S10 — data guarantees
+function s10(t) {
+  bg(t);
+  const sp = pop(t, V(58.29) - 0.2, 0.6, 30);
+  withA(sp.a, () => { ctx.save(); ctx.translate(540, 540 + sp.y); ctx.scale(sp.s, sp.s);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 320); g.addColorStop(0, 'rgba(85,214,230,0.22)'); g.addColorStop(1, 'rgba(85,214,230,0)'); ctx.fillStyle = g; ctx.fillRect(-340, -340, 680, 680);
+    ctx.save(); ctx.beginPath(); ctx.moveTo(0, -220); ctx.lineTo(190, -130); ctx.lineTo(180, 20); ctx.quadraticCurveTo(140, 160, 0, 225); ctx.quadraticCurveTo(-140, 160, -180, 20); ctx.lineTo(-190, -130); ctx.closePath();
+    const sg = ctx.createLinearGradient(0, -220, 0, 225); sg.addColorStop(0, '#13A0B0'); sg.addColorStop(1, '#0A5F6C'); ctx.fillStyle = sg; ctx.fill(); ctx.strokeStyle = C.cyan; ctx.lineWidth = 4; ctx.stroke(); ctx.restore();
+    const lk = back(pr(t, V(59.68), 0.4)); ctx.save(); ctx.scale(Math.max(0.6, lk), Math.max(0.6, lk)); icon('lock', 0, 10, 150, '#fff', 14); ctx.restore();
+    const r = ((t - V(60.32)) * 0.6) % 1; if (t > V(60.32)) { ctx.globalAlpha *= 1 - r; ctx.strokeStyle = C.cyan; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 250 + r * 120, 0, 7); ctx.stroke(); }
+    ctx.restore(); });
+  withA(eo(pr(t, V(58.29), 0.5)), () => { eyebrow('الضمانات', 1700, 300); T('بياناتكم ملككم', 1700, 380, { s: 80, w: 800 }); });
+  const B = [[V(59.12), 'ملك حصري للمؤسسة، مع إمكانية التصدير في أي وقت'], [V(59.68), 'صلاحيات دخول محمية لكل مستخدم'], [V(60.32), 'نسخ احتياطي دوري']];
+  B.forEach(([t0, s], i) => { const p = pop(t, t0, 0.45, 0); withA(p.a, () => { ctx.save(); ctx.translate((1 - p.a) * 40, 0); const y = 520 + i * 100; dia(1680, y, 12, C.cyan); T(s, 1650, y + 2, { s: 34, w: 700, f: 'Tajawal' }); ctx.restore(); }); });
+}
+
+// S11 — end card
+function s11(t) {
+  bg(t);
+  const lp = pr(t, 69.4, 1.2), tw = V(61.84);
+  const pulse = t > tw ? Math.exp(-(t - tw) * 2) : 0;
+  logo(470, 540, 230, { build: lp, glow: 0.5 + pulse });
+  if (t > tw) { const q = pr(t, tw, 1.0); ctx.save(); ctx.globalAlpha = 1 - q; dia(470, 540, 240 + q * 200, null, C.cyan, 3); ctx.restore(); }
+  withA(eo(pr(t, 69.6, 0.6)), () => { wordmark(1780, 130, 44); T('شريك النمو الرقمي', 1520, 133, { s: 24, w: 500, c: C.mut, f: 'Tajawal' }); });
+  const h = pop(t, 69.9, 0.6, 30);
+  withA(h.a, () => { ctx.save(); ctx.translate(0, h.y); eyebrow('الخطوة التالية', 1780, 300); T('نظامكم جاهز للتشغيل', 1780, 385, { s: 76, w: 800 }); T('خلال 3 أسابيع', 1780, 480, { s: 76, w: 800, c: C.cyan }); ctx.fillStyle = C.cyan; ctx.fillRect(1780 - 220, 550, 220, 6); ctx.restore(); });
+  const tag = pop(t, V(63.2), 0.6, 16);
+  withA(tag.a, () => T('TwinAI · شريك نموّكم الرقمي', 1780, 620 + tag.y, { s: 34, w: 700, c: C.white, f: 'Tajawal' }));
+  const rows = [[70.6, 'call', 'للتواصل والاعتماد', '+966 50 162 0249'], [70.85, 'globe', 'الموقع الإلكتروني', 'twinai.pro']];
+  rows.forEach(([t0, ic, k, v], i) => { const p = pop(t, t0, 0.5, 16); withA(p.a, () => { const y = 720 + i * 110 + p.y; RR(1700, y - 38, 80, 80, 20, 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0.14)', 1.5); icon(ic, 1740, y + 2, 34, C.cyan, 2.5);
+    T(k, 1670, y - 18, { s: 20, w: 500, c: C.mut, f: 'Tajawal' }); T(v, 1670, y + 22, { s: 38, w: 600, c: C.white, al: 'right', ltr: true }); }); });
+  withA(eo(pr(t, 71.4, 0.6)), () => { ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(140, 975, 1640, 1.5); T('مقدَّم إلى: مؤسسة الأثير الماسي لبيع وصيانة الجوالات', 1780, 1015, { s: 22, w: 500, c: C.mut, f: 'Tajawal' }); T('TwinAI · twinai.pro', 140, 1015, { s: 20, w: 500, c: C.mut2, al: 'left' }); });
+}
+
+// ================= timeline =================
+const SC = [[0, 6.8, s1], [6.8, 14.6, s2], [14.6, 18.4, s3], [18.4, 50.6, (t) => dash(t, 18.4)], [50.6, 58.8, s8], [58.8, 65.0, s9], [65.0, 69.4, s10], [69.4, DUR, s11]];
+const TR = 0.7; // diamond wipe duration
+function draw(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
+  let i = SC.findIndex(([a, b]) => t >= a && t < b); if (i < 0) i = SC.length - 1;
+  const [a, , fn] = SC[i];
+  if (i > 0 && t < a + TR) {
+    SC[i - 1][2](t);
+    const p = eio(pr(t, a, TR)), s = p * 1500;
+    ctx.save(); ctx.beginPath(); ctx.moveTo(960, 540 - s); ctx.lineTo(960 + s * 1.2, 540); ctx.lineTo(960, 540 + s); ctx.lineTo(960 - s * 1.2, 540); ctx.closePath(); ctx.clip(); fn(t); ctx.restore();
+    ctx.save(); ctx.globalAlpha = Math.sin(p * Math.PI); ctx.strokeStyle = C.cyan; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(960, 540 - s); ctx.lineTo(960 + s * 1.2, 540); ctx.lineTo(960, 540 + s); ctx.lineTo(960 - s * 1.2, 540); ctx.closePath(); ctx.stroke(); ctx.restore();
+  } else fn(t);
+  // global fade in/out
+  const fo = Math.max(1 - pr(t, 0, 0.4), pr(t, DUR - 0.8, 0.8));
+  if (fo > 0) { ctx.fillStyle = `rgba(7,13,24,${fo})`; ctx.fillRect(0, 0, W, H); }
+}
+window.__ready = false; window.seek = (t) => { draw(t); return true; };
+(async () => {
+  await Promise.all(['900 40px Cairo', '800 40px Cairo', '700 40px Cairo', '500 40px Tajawal', '700 40px Tajawal', '800 40px Tajawal', '600 40px Montserrat', '500 40px Montserrat'].map((f) => document.fonts.load(f, 'abcأب')));
+  await document.fonts.ready; window.__ready = true; draw(0);
+})();
+</script></body></html>

@@ -9,3 +9,4 @@ reels/*/out/_ov.png
 reels/*/out/v1_silent.mp4
 reels/*/out/v1_mix.wav
 reels/*/audio/v1_*.wav
+reels/*/out/render.log
